@@ -1,0 +1,253 @@
+/* ── Dobrovolný dárek – Admin CSS ─────────────────────────────────────────── */
+
+.dd-admin h1 { margin-bottom: 1.2em; }
+#dd-notices  { min-height: 2em; }
+
+/* Layout */
+.dd-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    align-items: start;
+    margin-top: 1em;
+}
+@media (max-width: 1100px) {
+    .dd-layout { grid-template-columns: 1fr; }
+}
+
+/* Panely */
+.dd-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.dd-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .8em 1.2em;
+    background: #f6f7f8;
+    border-bottom: 1px solid #ddd;
+}
+.dd-panel-header h2 { margin: 0; font-size: 1.1em; }
+
+/* Sekce uvnitř panelu */
+.dd-section {
+    padding: 1.2em;
+    border-bottom: 1px solid #f0f0f0;
+}
+.dd-section:last-child { border-bottom: none; }
+.dd-section h3 { margin-top: 0; margin-bottom: .8em; font-size: 1em; color: #3c3c3c; }
+
+/* Formulář */
+.dd-form-table th { width: 130px; padding: .5em 1em .5em 0; font-weight: 600; }
+.dd-form-table td { padding: .4em 0; }
+
+/* Řádky balíčků */
+.dd-pkg-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .75em 1.2em;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background .15s;
+}
+.dd-pkg-row:last-child { border-bottom: none; }
+.dd-pkg-row:hover      { background: #fafafa; }
+.dd-pkg-row.dd-inactive { opacity: .55; }
+
+.dd-pkg-info { display: flex; flex-direction: column; gap: .15em; }
+.dd-pkg-name { font-size: 1em; }
+.dd-pkg-meta { font-size: .82em; color: #777; }
+
+.dd-pkg-actions { display: flex; align-items: center; gap: .5em; }
+
+/* Toggle switch */
+.dd-toggle {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+    cursor: pointer;
+}
+.dd-toggle input { opacity: 0; width: 0; height: 0; }
+.dd-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: #ccc;
+    border-radius: 22px;
+    transition: .3s;
+}
+.dd-toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 3px; bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: .3s;
+}
+.dd-toggle input:checked + .dd-toggle-slider             { background: #2ecc71; }
+.dd-toggle input:checked + .dd-toggle-slider::before     { transform: translateX(20px); }
+
+/* Dokumenty */
+.dd-doc-list    { margin-bottom: 1em; }
+.dd-doc-row {
+    display: flex;
+    align-items: center;
+    gap: .6em;
+    padding: .4em .6em;
+    border-radius: 5px;
+    background: #f9f9f9;
+    margin-bottom: .4em;
+    font-size: .9em;
+}
+.dd-doc-icon  { font-size: 1.2em; }
+.dd-doc-name  { flex: 1; }
+.dd-doc-size  { color: #999; font-size: .82em; }
+
+.dd-upload-area {
+    background: #f6f7f8;
+    border: 1px dashed #bbb;
+    border-radius: 6px;
+    padding: 1em;
+    margin-top: .5em;
+}
+.dd-upload-area h4 { margin: 0 0 .6em; font-size: .95em; }
+
+/* Badge */
+.dd-badge {
+    display: inline-block;
+    padding: .15em .6em;
+    border-radius: 12px;
+    font-size: .78em;
+    font-weight: 700;
+    background: #8a2be2;
+    color: #fff;
+    margin-left: .4em;
+    vertical-align: middle;
+}
+.dd-badge-green { background: #2ecc71; }
+.dd-badge-gray  { background: #aaa; }
+
+/* Empty state */
+.dd-empty { padding: 1.5em; text-align: center; color: #999; }
+
+/* Statistiky */
+.dd-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 20px; }
+.dd-stat-card  { background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+.dd-stat-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .8em 1.2em; background: #f6f7f8; border-bottom: 1px solid #ddd;
+}
+.dd-stat-card-header h2 { margin: 0; font-size: 1.05em; }
+
+.dd-stat-numbers {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    text-align: center;
+    padding: 1em;
+    gap: .5em;
+}
+.dd-stat-box   { background: #f9f9f9; border-radius: 6px; padding: .6em .4em; }
+.dd-stat-num   { display: block; font-size: 1.6em; font-weight: 700; color: #8a2be2; }
+.dd-stat-label { font-size: .75em; color: #777; }
+
+.dd-stats-table-wrap { padding: 0 1em 1em; }
+.dd-stats-table      { font-size: .88em; }
+.dd-load-stats       { margin: .5em 1em 1em; }
+
+/* Nastavení */
+.dd-settings-info {
+    margin-top: 2em;
+    padding: 1em 1.5em;
+    background: #f0f8ff;
+    border-left: 4px solid #2271b1;
+    border-radius: 4px;
+}
+.dd-settings-info h3  { margin-top: 0; }
+.dd-settings-info ol  { margin: 0; padding-left: 1.3em; }
+.dd-settings-info li  { margin-bottom: .4em; }
+
+/* ── Pravidla (kategorie + produkty) ─────────────────────────────────────── */
+.dd-rules-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5em;
+    margin-bottom: .5em;
+}
+@media (max-width: 900px) { .dd-rules-grid { grid-template-columns: 1fr; } }
+
+.dd-rules-col h4 { margin: 0 0 .5em; font-size: .95em; }
+
+.dd-cat-scroll {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: .5em .7em;
+    background: #fafafa;
+}
+.dd-cat-tree       { list-style: none; margin: 0; padding: 0; }
+.dd-cat-tree li    { margin: .25em 0; }
+.dd-cat-tree label { display: flex; align-items: center; gap: .4em; cursor: pointer; }
+
+/* Vyhledávání produktů */
+#dd-product-search  { width: 100%; margin-bottom: .4em; }
+.dd-prod-results {
+    max-height: 150px; overflow-y: auto;
+    border: 1px solid #ddd; border-radius: 4px;
+    background: #fff; display: none;
+}
+.dd-prod-results:not(:empty) { display: block; }
+.dd-prod-result {
+    padding: .35em .6em; cursor: pointer; font-size: .9em;
+    border-bottom: 1px solid #f0f0f0;
+}
+.dd-prod-result:last-child { border-bottom: none; }
+.dd-prod-result:hover { background: #e8f0fe; }
+
+.dd-prod-tags { display: flex; flex-wrap: wrap; gap: .4em; margin-top: .5em; min-height: 1.8em; }
+.dd-prod-tag {
+    display: inline-flex; align-items: center; gap: .3em;
+    background: #e8f0fe; border: 1px solid #b3c7f7;
+    border-radius: 12px; padding: .2em .7em; font-size: .85em;
+}
+.dd-remove-prod {
+    background: none; border: none; cursor: pointer;
+    color: #555; font-size: 1em; padding: 0; line-height: 1;
+}
+.dd-remove-prod:hover { color: #c00; }
+
+/* ── Košík – dárková sekce ────────────────────────────────────────────────── */
+.dd-gift-section {
+    margin: 1.2em 0;
+    padding: 1em 1.2em;
+    border: 2px dashed #f0a500;
+    border-radius: 8px;
+    background: #fffdf0;
+}
+.dd-gift-heading { margin: 0 0 .7em; font-size: 1em; color: #7a5500; }
+
+.dd-gift-row      { margin-bottom: .6em; }
+.dd-gift-row:last-child { margin-bottom: 0; }
+
+.dd-gift-label    { display: flex; align-items: flex-start; gap: .5em; cursor: pointer; font-weight: 600; }
+.dd-gift-label input { margin-top: .15em; width: 1.1em; height: 1.1em; flex-shrink: 0; }
+.dd-gift-desc     { margin: .3em 0 0 1.6em; font-size: .88em; color: #666; }
+.dd-gift-intro    { margin: 0 0 .4em; font-weight: 600; font-size: .95em; }
+
+.dd-radio-label   { display: flex; align-items: center; gap: .5em; margin: .3em 0; cursor: pointer; }
+.dd-radio-label input { width: 1.1em; height: 1.1em; }
+
+.dd-gift-crosssell {
+    border-top: 1px dashed #ccc;
+    padding-top: .6em;
+    margin-top: .6em;
+}
+.dd-gift-crosssell .dd-gift-label { color: #555; font-weight: normal; font-size: .92em; }
+
+/* Vyčerpané dárky */
+.dd-gift-exhausted { border-top: 1px dashed #ccc; padding-top: .6em; margin-top: .4em; }
+.dd-gift-exhausted-msg { margin: 0; font-size: .92em; color: #777; font-style: italic; }
