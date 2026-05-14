@@ -5,7 +5,7 @@
     var selectionInProgress = false;
     var iconFragment = 'package-icon.svg';
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
-    var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart', '.wc-block-cart-items'];
+    var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart-items', '.wc-block-cart'];
     var giftRowDebounceMs = 60;
     var giftRowObserver = null;
     var giftRowTimer = null;
@@ -59,10 +59,13 @@
 
     function setupGiftRowObserver() {
         var root = null;
-        cartRootSelectors.some(function (selector) {
+        for (var i = 0; i < cartRootSelectors.length; i += 1) {
+            var selector = cartRootSelectors[i];
             root = document.querySelector(selector);
-            return !!root;
-        });
+            if (root) {
+                break;
+            }
+        }
         if (!root) {
             return;
         }
