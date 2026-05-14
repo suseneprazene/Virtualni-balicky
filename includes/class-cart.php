@@ -635,10 +635,10 @@ class DD_Cart {
             wp_send_json_error( [ 'message' => __( 'Košík není dostupný.', 'virtualni-balicek' ) ] );
         }
 
-        $package_id   = (int) ( $_POST['package_id'] ?? 0 );
-        $type_raw     = sanitize_key( $_POST['type'] ?? 'direct' );
-        $allowed_type = [ 'direct', 'crosssell' ];
-        if ( ! in_array( $type_raw, $allowed_type, true ) ) {
+        $package_id    = (int) ( $_POST['package_id'] ?? 0 );
+        $type_raw      = sanitize_key( $_POST['type'] ?? 'direct' );
+        $allowed_types = [ 'direct', 'crosssell' ];
+        if ( ! in_array( $type_raw, $allowed_types, true ) ) {
             wp_send_json_error( [ 'message' => __( 'Neplatný typ balíčku.', 'virtualni-balicek' ) ] );
         }
         $type    = $type_raw;

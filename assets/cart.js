@@ -46,6 +46,7 @@
 
             if (!res || !res.success) {
                 console.error('DD select failed:', {
+                    endpoint: DD_Cart.ajax_url + '?action=dd_select_package',
                     packageId: packageId,
                     type: type,
                     checked: checked,
@@ -94,6 +95,7 @@
 
         // Fallback pro případy, kdy Store API invalidate není dostupné
         if (!refreshed) {
+            console.warn('DD block cart refresh fallback: reloading page');
             window.location.reload();
         }
     }
