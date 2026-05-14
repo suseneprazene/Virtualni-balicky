@@ -45,7 +45,12 @@
             selectionInProgress = false;
 
             if (!res || !res.success) {
-                console.error('DD select failed:', res && res.data ? res.data : res);
+                console.error('DD select failed:', {
+                    packageId: packageId,
+                    type: type,
+                    checked: checked,
+                    response: res && res.data ? res.data : res
+                });
                 return;
             }
 
