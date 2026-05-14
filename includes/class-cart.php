@@ -238,7 +238,7 @@ class DD_Cart {
         if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
         $email = self::get_customer_email();
         foreach ( $cart->get_cart() as $key => $item ) {
-            if ( ! isset( $item[ self::CART_ITEM_KEY ] ) || empty( $item['data'] ) ) {
+            if ( ! isset( $item[ self::CART_ITEM_KEY ] ) || ! isset( $item['data'] ) || $item['data'] === false ) {
                 continue;
             }
             $pkg_id = (int) $item[ self::CART_ITEM_KEY ];

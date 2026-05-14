@@ -42,9 +42,13 @@ class DD_Order {
         if ( WC()->cart ) {
             foreach ( DD_Cart::get_dd_cart_items() as $item ) {
                 $type = $item['dd_type'] ?? 'direct';
-                $id   = (int) $item[ DD_Cart::CART_ITEM_KEY ];
-                if ( $type === 'direct' ) $selected = $id;
-                if ( $type === 'crosssell' ) $xsell = $id;
+                $id   = (int) ( $item[ DD_Cart::CART_ITEM_KEY ] ?? 0 );
+                if ( $type === 'direct' ) {
+                    $selected = $id;
+                }
+                if ( $type === 'crosssell' ) {
+                    $xsell = $id;
+                }
             }
         }
 
