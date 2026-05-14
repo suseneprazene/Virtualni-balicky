@@ -45,9 +45,7 @@
             selectionInProgress = false;
 
             if (!res || !res.success) {
-                if (window.console && console.error) {
-                    console.error('DD select failed:', res && res.data ? res.data : res);
-                }
+                console.error('DD select failed:', res && res.data ? res.data : res);
                 return;
             }
 
@@ -56,8 +54,8 @@
                 if (res.data && res.data.html) {
                     replaceGiftSection(res.data.html);
                 }
-                // Blokový košík drží vlastní Store API stav, reload zajistí propsání DD řádku.
-                window.location.reload();
+                // Triggeruj přepočet blokového košíku
+                triggerBlockCartRefresh();
             } else {
                 $(document.body).trigger('wc_update_cart');
             }
@@ -73,6 +71,26 @@
         tmp.innerHTML = html;
         var newSection = tmp.querySelector('#dd-gift-section');
         if (newSection) existing.replaceWith(newSection);
+    }
+
+    function triggerBlockCartRefresh() {
+        var refreshed = false;
+
+        // WooCommerce blocks používá vlastní store (@woocommerce/block-data)
+        if (window.wp && window.wp.data) {
+            try {
+                var cartStore = window.wp.data.dispatch('wc/store/cart');
+                if (cartStore && typeof cartStore.invalidateResolutionForStore === 'function') {
+                    cartStore.invalidateResolutionForStore();
+                    refreshed = true;
+                }
+            } catch (e) {}
+        }
+
+        // Fallback pro případy, kdy Store API invalidate není dostupné
+        if (!refreshed) {
+            window.location.reload();
+        }
     }
 
     window.DD_Cart_init = init;
