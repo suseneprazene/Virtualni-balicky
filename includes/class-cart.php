@@ -63,9 +63,6 @@ class DD_Cart {
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'dd_cart_nonce' ),
             'is_block_cart' => self::is_block_cart() ? '1' : '0',
-            'fixed_qty_label' => __( '1 kus', 'virtualni-balicek' ),
-            'package_icon_fragment' => 'package-icon.svg',
-            'quantity_lock_debounce_ms' => 50,
         ] );
 
         wp_add_inline_style( 'woocommerce-general', self::cart_css() );
@@ -388,7 +385,7 @@ class DD_Cart {
 
     public static function cart_item_quantity( string $quantity, array $cart_item, string $cart_item_key ): string {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $quantity;
-        return '1';
+        return '';
     }
 
     // ── Sestavení HTML dárkové sekce ─────────────────────────────────────────
@@ -839,11 +836,7 @@ class DD_Cart {
             display:inline !important;
         }
         .dd-info-close:hover{color:#333 !important;background:none !important;box-shadow:none !important;}
-        .dd-fixed-qty{display:inline-block;font-weight:600;white-space:nowrap;}
-        .dd-cart-item .product-quantity input.qty,
-        .dd-cart-item .product-quantity .quantity,
-        .dd-cart-item .product-quantity .plus,
-        .dd-cart-item .product-quantity .minus,
+        .dd-cart-item .product-quantity,
         .dd-cart-item .wc-block-components-quantity-selector,
         .dd-cart-item .wc-block-cart-item__quantity{
             display:none !important;

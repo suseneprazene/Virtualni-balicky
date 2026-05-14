@@ -2,17 +2,9 @@
 (function ($) {
     'use strict';
 
-    var PACKAGE_ICON_FRAGMENT = DD_Cart.package_icon_fragment || 'package-icon.svg';
-    var FIXED_QTY_LABEL = DD_Cart.fixed_qty_label || '1 ks';
-    var QUANTITY_LOCK_DEBOUNCE_MS = parseInt(DD_Cart.quantity_lock_debounce_ms, 10) || 50;
     var selectionInProgress = false;
-    var quantityObserver = null;
-    var quantityLockTimer = null;
 
     function init() {
-        lockGiftQuantities();
-        setupQuantityObserver();
-
         // Přímé balíčky – vzájemné vylučování: zaškrtnutím jednoho se ostatní odškrtnou
         $(document).off('change.dd', '.dd-pkg-checkbox').on('change.dd', '.dd-pkg-checkbox', function () {
             var $this = $(this);
@@ -36,87 +28,6 @@
 
         $(document).off('change.dd', '.dd-pkg-radio').on('change.dd', '.dd-pkg-radio', function () {
             sendSelection($(this).val(), $(this).data('type') || 'direct', 1);
-        });
-    }
-
-    function lockGiftQuantities() {
-        var selectors = [
-            'tr.cart_item',
-            '.wc-block-cart-items__row',
-            '.wc-block-components-order-summary-item',
-            'li.wc-block-cart-items__row'
-        ];
-
-        document.querySelectorAll(selectors.join(',')).forEach(function (row) {
-            if (!isGiftRow(row)) {
-                return;
-            }
-
-            row.classList.add('dd-cart-item');
-
-            row.querySelectorAll(
-                '.plus, .minus, .qty, .quantity, .wc-block-components-quantity-selector, .wc-block-cart-item__quantity'
-            ).forEach(function (el) {
-                el.style.display = 'none';
-            });
-
-            if (!row.querySelector('.dd-fixed-qty')) {
-                var qty = document.createElement('span');
-                qty.className = 'dd-fixed-qty';
-                qty.textContent = FIXED_QTY_LABEL;
-
-                var target =
-                    row.querySelector('.product-quantity') ||
-                    row.querySelector('.wc-block-components-product-details') ||
-                    row.querySelector('.wc-block-cart-item__wrap') ||
-                    row;
-
-                target.appendChild(qty);
-            }
-        });
-    }
-
-    function isGiftRow(row) {
-        if (row.classList.contains('dd-cart-item')) {
-            return true;
-        }
-
-        if (row.querySelector('[data-dd-gift-item="1"]')) {
-            return true;
-        }
-
-        var image = row.querySelector('img');
-        var src = image ? (image.getAttribute('src') || '') : '';
-
-        return src.indexOf(PACKAGE_ICON_FRAGMENT) !== -1;
-    }
-
-    function setupQuantityObserver() {
-        var container = document.querySelector('form.woocommerce-cart-form, .wc-block-cart, .wc-block-cart-items');
-        if (!container) {
-            return;
-        }
-
-        if (quantityObserver) {
-            quantityObserver.disconnect();
-        }
-
-        quantityObserver = new MutationObserver(function () {
-            if (quantityLockTimer) {
-                window.clearTimeout(quantityLockTimer);
-            }
-
-            quantityLockTimer = window.setTimeout(function () {
-                lockGiftQuantities();
-                quantityLockTimer = null;
-            }, QUANTITY_LOCK_DEBOUNCE_MS);
-        });
-
-        quantityObserver.observe(container, {
-            attributes: false,
-            characterData: false,
-            childList: true,
-            subtree: true
         });
     }
 
@@ -214,7 +125,6 @@
 
             // Re-bind DD event listeners on the replaced DOM.
             init();
-            lockGiftQuantities();
             $(document.body).trigger('wc_fragment_refresh');
         }).fail(function () {
             // Fallback to the standard WC event.
@@ -229,7 +139,6 @@
         tmp.innerHTML = html;
         var newSection = tmp.querySelector('#dd-gift-section');
         if (newSection) existing.replaceWith(newSection);
-        lockGiftQuantities();
     }
 
     window.DD_Cart_init = init;
