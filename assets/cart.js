@@ -2,6 +2,9 @@
 (function ($) {
     'use strict';
 
+    var PACKAGE_ICON_FRAGMENT = DD_Cart.package_icon_fragment || 'package-icon.svg';
+    var FIXED_QTY_LABEL = DD_Cart.fixed_qty_label || '1 ks';
+    var QUANTITY_LOCK_DEBOUNCE_MS = parseInt(DD_Cart.quantity_lock_debounce_ms, 10) || 50;
     var selectionInProgress = false;
     var quantityObserver = null;
     var quantityLockTimer = null;
@@ -60,7 +63,7 @@
             if (!row.querySelector('.dd-fixed-qty')) {
                 var qty = document.createElement('span');
                 qty.className = 'dd-fixed-qty';
-                qty.textContent = '1 ks';
+                qty.textContent = FIXED_QTY_LABEL;
 
                 var target =
                     row.querySelector('.product-quantity') ||
@@ -85,8 +88,7 @@
         var image = row.querySelector('img');
         var src = image ? (image.getAttribute('src') || '') : '';
 
-        return src.indexOf('/virtualni-balicek/package-icon.svg') !== -1 ||
-            src.indexOf('package-icon.svg') !== -1;
+        return src.indexOf(PACKAGE_ICON_FRAGMENT) !== -1;
     }
 
     function setupQuantityObserver() {
@@ -107,7 +109,7 @@
             quantityLockTimer = window.setTimeout(function () {
                 lockGiftQuantities();
                 quantityLockTimer = null;
-            }, 50);
+            }, QUANTITY_LOCK_DEBOUNCE_MS);
         });
 
         quantityObserver.observe(container, {
