@@ -247,8 +247,13 @@ class DD_Admin {
     private static function normalize_uploaded_files(): array {
         $files = [];
 
-        if ( ! empty( $_FILES['files'] ) && is_array( $_FILES['files']['name'] ?? null ) ) {
-            $count = count( (array) $_FILES['files']['name'] );
+        if (
+            ! empty( $_FILES['files'] )
+            && is_array( $_FILES['files'] )
+            && isset( $_FILES['files']['name'], $_FILES['files']['tmp_name'], $_FILES['files']['error'], $_FILES['files']['size'] )
+            && is_array( $_FILES['files']['name'] )
+        ) {
+            $count = count( $_FILES['files']['name'] );
             for ( $i = 0; $i < $count; $i++ ) {
                 $files[] = [
                     'name'     => (string) ( $_FILES['files']['name'][ $i ] ?? '' ),
@@ -269,7 +274,7 @@ class DD_Admin {
         }
 
         return array_values( array_filter( $files, static function( array $f ): bool {
-            return ! empty( $f['name'] ) || ! empty( $f['tmp_name'] );
+            return ! empty( $f['name'] ) && ! empty( $f['tmp_name'] );
         } ) );
     }
 
@@ -293,6 +298,7 @@ class DD_Admin {
             'text/plain',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
+        $allowed_exts = [ 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip', 'epub', 'txt', 'docx' ];
 
         $finfo = finfo_open( FILEINFO_MIME_TYPE );
         $mime  = finfo_file( $finfo, $file['tmp_name'] );
@@ -305,10 +311,14 @@ class DD_Admin {
             return new WP_Error( 'file_too_large', 'Max 20 MB.' );
         }
 
+        $ext = strtolower( (string) pathinfo( (string) $file['name'], PATHINFO_EXTENSION ) );
+        if ( $ext === '' || ! in_array( $ext, $allowed_exts, true ) ) {
+            return new WP_Error( 'extension_not_allowed', 'Nepodporovaná přípona souboru.' );
+        }
+
         DD_Installer::create_upload_dir();
         $dir      = DD_Installer::get_upload_dir();
-        $ext      = pathinfo( (string) $file['name'], PATHINFO_EXTENSION );
-        $filename = 'pkg' . $package_id . '_' . uniqid() . ( $ext ? '.' . strtolower( $ext ) : '' );
+        $filename = 'pkg' . $package_id . '_' . uniqid() . '.' . $ext;
         $dest     = $dir . '/' . $filename;
 
         if ( ! move_uploaded_file( $file['tmp_name'], $dest ) ) {

@@ -64,6 +64,7 @@ class DD_Cart {
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'dd_cart_nonce' ),
             'is_block_cart' => self::is_block_cart() ? '1' : '0',
+            'package_label_needle' => (string) __( 'Virtuální balíček', 'virtualni-balicek' ),
         ] );
 
         wp_add_inline_style( 'woocommerce-general', self::cart_css() );
@@ -409,10 +410,6 @@ class DD_Cart {
         $category_ids = DD_Package::get_category_ids_for_products( $product_ids );
         $resolved     = DD_Package::resolve_for_cart( $product_ids, $category_ids );
         $email        = self::get_customer_email();
-        $exact_matches = array_values( array_filter( $resolved['matched'], static function ( $pkg ) {
-            return ( $pkg->match_reason ?? '' ) === 'direct';
-        } ) );
-
         $available = array_values( array_filter( $resolved['matched'], function ( $pkg ) use ( $email ) {
             if ( ! $email ) return true;
             return DD_Package::has_unsent( (int) $pkg->id, $email );
@@ -462,7 +459,11 @@ class DD_Cart {
         }
 
         $selection_locked = $selected_id > 0 || $xsell_id > 0;
-        $has_exact_match  = ! empty( $exact_matches );
+        $has_exact_match  = (bool) array_filter( $resolved['matched'], static function ( $pkg ) {
+            return ( $pkg->match_reason ?? '' ) === 'direct';
+        } );
+        // Fallback režim: v košíku není žádná přesná shoda pravidel, ale nějaké
+        // balíčky jsou stále dostupné (typicky univerzální / z jiných kategorií).
         $fallback_mode    = ! $has_exact_match && ( ! empty( $available ) || ! empty( $crosssell_pkgs ) );
         $fallback_categories = self::available_fallback_categories( array_merge( $available, $crosssell_pkgs ) );
 

@@ -4,7 +4,7 @@
 
     var selectionInProgress = false;
     var packageIconFilename = 'package-icon.svg';
-    var packageLabelNeedle = 'virtuální balíček';
+    var packageLabelNeedle = ((DD_Cart && DD_Cart.package_label_needle) || 'Virtuální balíček').toLowerCase();
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
     var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart-items', '.wc-block-cart'];
     var giftRowDebounceMs = 60;

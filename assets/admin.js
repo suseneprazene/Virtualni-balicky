@@ -131,6 +131,10 @@
                 docs.forEach(doc => appendDocRow(doc));
                 $('#dd-doc-name').val(''); $('#dd-doc-file').val('');
                 updateDocCount(docs.length);
+                if (!docs.length) {
+                    showNotice('success', 'Nahrávání dokončeno.');
+                    return;
+                }
                 showNotice('success', docs.length > 1
                     ? `Nahráno dokumentů: ${docs.length}.`
                     : `Dokument „${docs[0].name}" nahrán.`);
