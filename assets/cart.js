@@ -44,13 +44,20 @@
         }, function (res) {
             selectionInProgress = false;
 
+            if (!res || !res.success) {
+                if (window.console && console.error) {
+                    console.error('DD select failed:', res && res.data ? res.data : res);
+                }
+                return;
+            }
+
             if (DD_Cart.is_block_cart === '1') {
                 // Aktualizuj naši sekci v DOM
-                if (res.success && res.data && res.data.html) {
+                if (res.data && res.data.html) {
                     replaceGiftSection(res.data.html);
                 }
-                // Triggeruj přepočet blokového košíku
-                triggerBlockCartRefresh();
+                // Blokový košík drží vlastní Store API stav, reload zajistí propsání DD řádku.
+                window.location.reload();
             } else {
                 $(document.body).trigger('wc_update_cart');
             }
@@ -66,18 +73,6 @@
         tmp.innerHTML = html;
         var newSection = tmp.querySelector('#dd-gift-section');
         if (newSection) existing.replaceWith(newSection);
-    }
-
-    function triggerBlockCartRefresh() {
-        // WooCommerce blocks používá vlastní store (@woocommerce/block-data)
-        // Nejjednodušší způsob: invalidate store přes WP data pokud je dostupný
-        if (window.wp && window.wp.data) {
-            try {
-                window.wp.data.dispatch('wc/store/cart').invalidateResolutionForStore();
-            } catch(e) {}
-        }
-        // Fallback: přenačti stránku jen pokud nic jiného nefunguje
-        // (nezahrnuto záměrně – cena se promítne při checkoutu)
     }
 
     window.DD_Cart_init = init;

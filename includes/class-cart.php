@@ -628,18 +628,53 @@ class DD_Cart {
     public static function ajax_select(): void {
         check_ajax_referer( 'dd_cart_nonce', 'nonce' );
 
+        if ( function_exists( 'wc_load_cart' ) ) {
+            wc_load_cart();
+        }
+        if ( ! WC()->cart ) {
+            wp_send_json_error( [ 'message' => 'Košík není dostupný.' ] );
+        }
+
         $package_id = (int) ( $_POST['package_id'] ?? 0 );
         $type       = sanitize_key( $_POST['type'] ?? 'direct' );
+        $type       = $type === 'crosssell' ? 'crosssell' : 'direct';
         $checked    = (bool) absint( $_POST['checked'] ?? 1 );
 
+        if ( $package_id <= 0 ) {
+            wp_send_json_error( [ 'message' => 'Neplatné ID balíčku.' ] );
+        }
+
         if ( $checked ) {
-            self::add_package_to_cart( $package_id, $type );
+            $cart_key = self::add_package_to_cart( $package_id, $type );
+            if ( ! $cart_key ) {
+                wp_send_json_error( [ 'message' => 'Balíček se nepodařilo přidat do košíku.' ] );
+            }
         } else {
             self::remove_package_from_cart( $package_id, $type );
         }
 
         WC()->cart->calculate_totals();
-        wp_send_json_success( [ 'html' => self::build_gift_html() ] );
+        WC()->cart->set_session();
+        if ( method_exists( WC()->cart, 'maybe_set_cart_cookies' ) ) {
+            WC()->cart->maybe_set_cart_cookies();
+        }
+
+        $dd_items = array_values( array_map(
+            static function ( array $item ): array {
+                return [
+                    'package_id' => (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 ),
+                    'type'       => (string) ( $item['dd_type'] ?? 'direct' ),
+                ];
+            },
+            self::get_dd_cart_items()
+        ) );
+
+        wp_send_json_success( [
+            'html'      => self::build_gift_html(),
+            'dd_items'  => $dd_items,
+            'dd_count'  => count( $dd_items ),
+            'cart_size' => count( WC()->cart->get_cart() ),
+        ] );
     }
 
     // ── CSS ───────────────────────────────────────────────────────────────────
