@@ -36,19 +36,32 @@ class DD_Order {
     // ── Společná logika uložení ───────────────────────────────────────────────
 
     private static function do_save_gift_choice( WC_Order $order ): void {
-        // Načti session
-        $session = WC()->session;
-        if ( ! $session ) {
-            // Pokud session není dostupná (např. REST API), zkusíme customer session
-            $session = WC()->customer ? WC()->session : null;
+        $selected = 0;
+        $xsell    = 0;
+
+        if ( WC()->cart ) {
+            foreach ( DD_Cart::get_dd_cart_items() as $item ) {
+                $type = $item['dd_type'] ?? 'direct';
+                $id   = (int) $item[ DD_Cart::CART_ITEM_KEY ];
+                if ( $type === 'direct' ) $selected = $id;
+                if ( $type === 'crosssell' ) $xsell = $id;
+            }
         }
 
-        $selected = $session ? (int) $session->get( DD_Cart::SESSION_KEY )   : 0;
-        $xsell    = $session ? (int) $session->get( DD_Cart::SESSION_XSELL ) : 0;
+        // Fallback na starou session (zpětná kompatibilita)
+        $session = WC()->session;
+        if ( ! $selected && $session ) {
+            $val = (int) $session->get( DD_Cart::SESSION_KEY );
+            if ( $val ) $selected = $val;
+        }
+        if ( ! $xsell && $session ) {
+            $val = (int) $session->get( DD_Cart::SESSION_XSELL );
+            if ( $val ) $xsell = $val;
+        }
 
         // Náhodný výběr – vylosuj teď
         if ( $selected === -1 ) {
-            $product_ids  = array_map( fn( $i ) => (int) $i['product_id'], WC()->cart ? WC()->cart->get_cart() : [] );
+            $product_ids  = DD_Cart::get_cart_product_ids();
             if ( empty( $product_ids ) ) {
                 // Z položek objednávky
                 $product_ids = array_map( fn( $i ) => $i->get_product_id(), array_values( $order->get_items() ) );

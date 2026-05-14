@@ -1,8 +1,23 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+class DD_Virtual_Product extends WC_Product {
+    public function exists(): bool {
+        return true;
+    }
+
+    public function is_purchasable(): bool {
+        return true;
+    }
+
+    public function get_type(): string {
+        return 'dd_virtual';
+    }
+}
+
 class DD_Cart {
 
+    const CART_ITEM_KEY = 'dd_package_id';
     const SESSION_KEY   = 'dd_selected_package';
     const SESSION_XSELL = 'dd_crosssell_package';
 
@@ -13,11 +28,12 @@ class DD_Cart {
         // Skripty
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_scripts' ] );
 
-        // Poplatek
-        add_action( 'woocommerce_cart_calculate_fees', [ __CLASS__, 'apply_fee' ] );
-
-        // Checkout refresh
-        add_action( 'woocommerce_checkout_update_order_review', [ __CLASS__, 'update_session_from_post' ] );
+        add_filter( 'woocommerce_get_cart_item_from_session', [ __CLASS__, 'restore_cart_item_from_session' ], 10, 3 );
+        add_action( 'woocommerce_before_calculate_totals',    [ __CLASS__, 'set_virtual_item_prices' ], 20 );
+        add_filter( 'woocommerce_cart_item_name',             [ __CLASS__, 'cart_item_name' ], 10, 3 );
+        add_filter( 'woocommerce_cart_item_price',            [ __CLASS__, 'cart_item_price' ], 10, 3 );
+        add_filter( 'woocommerce_cart_item_quantity',         [ __CLASS__, 'cart_item_quantity' ], 10, 3 );
+        add_filter( 'woocommerce_cart_item_subtotal',         [ __CLASS__, 'cart_item_subtotal' ], 10, 3 );
 
         // AJAX
         add_action( 'wp_ajax_dd_select_package',        [ __CLASS__, 'ajax_select' ] );
@@ -89,15 +105,184 @@ class DD_Cart {
         if ( ! WC()->cart ) return [];
         $ids = [];
         foreach ( WC()->cart->get_cart() as $item ) {
+            if ( isset( $item[ self::CART_ITEM_KEY ] ) ) {
+                continue;
+            }
             $ids[] = (int) $item['product_id'];
         }
-        return array_unique( $ids );
+        return array_values( array_filter( array_unique( $ids ) ) );
     }
 
     public static function get_customer_email(): string {
         if ( is_user_logged_in() ) return wp_get_current_user()->user_email;
         $email = WC()->session ? WC()->session->get( 'billing_email' ) : '';
         return sanitize_email( $email ?: '' );
+    }
+
+    public static function make_virtual_product( object $pkg ): DD_Virtual_Product {
+        $product = new DD_Virtual_Product( 0 );
+        $label   = (string) get_option( 'dd_checkbox_label', '' );
+        $name    = $label !== '' ? $label : (string) $pkg->name;
+
+        $product->set_name( $name );
+        $product->set_price( (float) $pkg->price );
+        $product->set_virtual( true );
+        $product->set_manage_stock( false );
+        $product->set_stock_status( 'instock' );
+        $product->set_catalog_visibility( 'hidden' );
+
+        return $product;
+    }
+
+    public static function get_dd_cart_items(): array {
+        if ( ! WC()->cart ) return [];
+        $items = [];
+        foreach ( WC()->cart->get_cart() as $key => $item ) {
+            if ( isset( $item[ self::CART_ITEM_KEY ] ) ) {
+                $items[ $key ] = $item;
+            }
+        }
+        return $items;
+    }
+
+    public static function add_package_to_cart( int $pkg_id, string $type = 'direct' ): ?string {
+        if ( ! WC()->cart || $pkg_id <= 0 ) return null;
+
+        $pkg = DD_Package::get( $pkg_id );
+        if ( ! $pkg || ! $pkg->active ) return null;
+
+        $type = $type === 'crosssell' ? 'crosssell' : 'direct';
+
+        if ( $type === 'direct' ) {
+            foreach ( self::get_dd_cart_items() as $key => $item ) {
+                if ( ( $item['dd_type'] ?? 'direct' ) === 'direct' ) {
+                    unset( WC()->cart->cart_contents[ $key ] );
+                }
+            }
+        }
+
+        foreach ( self::get_dd_cart_items() as $key => $item ) {
+            if ( (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 ) === $pkg_id && ( $item['dd_type'] ?? 'direct' ) === $type ) {
+                return $key;
+            }
+        }
+
+        $email   = self::get_customer_email();
+        $price   = (float) $pkg->price;
+        $is_free = $email ? DD_Package::is_first_free_eligible( $pkg_id, $email ) : false;
+        if ( $is_free ) {
+            $price = 0.0;
+        }
+
+        $product  = self::make_virtual_product( $pkg );
+        $product->set_price( $price );
+        $cart_key = WC()->cart->generate_cart_id( 0, 0, 0, [ self::CART_ITEM_KEY => $pkg_id, 'dd_type' => $type ] );
+
+        WC()->cart->cart_contents[ $cart_key ] = [
+            'key'               => $cart_key,
+            'product_id'        => 0,
+            'variation_id'      => 0,
+            'variation'         => [],
+            'quantity'          => 1,
+            'data'              => $product,
+            'data_hash'         => wc_get_cart_item_data_hash( $product ),
+            self::CART_ITEM_KEY => $pkg_id,
+            'dd_type'           => $type,
+            'line_tax_data'     => [ 'subtotal' => [], 'total' => [] ],
+            'line_subtotal'     => $price,
+            'line_subtotal_tax' => 0,
+            'line_total'        => $price,
+            'line_tax'          => 0,
+        ];
+
+        WC()->cart->set_session();
+
+        return $cart_key;
+    }
+
+    public static function remove_package_from_cart( int $pkg_id, string $type = 'direct' ): void {
+        if ( ! WC()->cart || $pkg_id <= 0 ) return;
+        $changed = false;
+        $type    = $type === 'crosssell' ? 'crosssell' : 'direct';
+        foreach ( self::get_dd_cart_items() as $key => $item ) {
+            if ( (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 ) === $pkg_id && ( $item['dd_type'] ?? 'direct' ) === $type ) {
+                unset( WC()->cart->cart_contents[ $key ] );
+                $changed = true;
+            }
+        }
+        if ( $changed ) {
+            WC()->cart->set_session();
+        }
+    }
+
+    public static function restore_cart_item_from_session( array $cart_item, array $values, string $key ): array {
+        if ( ! isset( $values[ self::CART_ITEM_KEY ] ) ) {
+            return $cart_item;
+        }
+
+        $pkg_id = (int) $values[ self::CART_ITEM_KEY ];
+        $pkg    = DD_Package::get( $pkg_id );
+        if ( ! $pkg || ! $pkg->active ) {
+            $cart_item['data'] = false;
+            return $cart_item;
+        }
+
+        $cart_item['data']              = self::make_virtual_product( $pkg );
+        $cart_item[ self::CART_ITEM_KEY ] = $pkg_id;
+        $cart_item['dd_type']           = $values['dd_type'] ?? 'direct';
+
+        return $cart_item;
+    }
+
+    public static function set_virtual_item_prices( WC_Cart $cart ): void {
+        if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
+        $email = self::get_customer_email();
+        foreach ( $cart->get_cart() as $key => $item ) {
+            if ( ! isset( $item[ self::CART_ITEM_KEY ] ) || empty( $item['data'] ) ) {
+                continue;
+            }
+            $pkg_id = (int) $item[ self::CART_ITEM_KEY ];
+            $pkg    = DD_Package::get( $pkg_id );
+            if ( ! $pkg || ! $pkg->active ) {
+                continue;
+            }
+            $price   = (float) $pkg->price;
+            $is_free = $email ? DD_Package::is_first_free_eligible( $pkg_id, $email ) : false;
+            if ( $is_free ) {
+                $price = 0.0;
+            }
+            $item['data']->set_price( $price );
+            $cart->cart_contents[ $key ]['line_subtotal']     = $price;
+            $cart->cart_contents[ $key ]['line_subtotal_tax'] = 0;
+            $cart->cart_contents[ $key ]['line_total']        = $price;
+            $cart->cart_contents[ $key ]['line_tax']          = 0;
+        }
+    }
+
+    public static function cart_item_name( string $name, array $cart_item, string $cart_item_key ): string {
+        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
+        $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
+        if ( ! $pkg ) return $name;
+        $label = get_option( 'dd_checkbox_label', __( 'Přidat náhodný balíček', 'virtualni-balicek' ) );
+        return '🎁 ' . esc_html( $label ) . ' – ' . esc_html( $pkg->name );
+    }
+
+    public static function cart_item_price( string $price_html, array $cart_item, string $cart_item_key ): string {
+        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $price_html;
+        $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
+        if ( ! $pkg ) return $price_html;
+        $email = self::get_customer_email();
+        $ff    = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
+        return self::price_text_html( $pkg, $ff );
+    }
+
+    public static function cart_item_subtotal( string $subtotal, array $cart_item, string $cart_item_key ): string {
+        return self::cart_item_price( $subtotal, $cart_item, $cart_item_key );
+    }
+
+    public static function cart_item_quantity( string $quantity, array $cart_item, string $cart_item_key ): string {
+        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $quantity;
+        return '1';
     }
 
     // ── Sestavení HTML dárkové sekce ─────────────────────────────────────────
@@ -130,8 +315,17 @@ class DD_Cart {
 
         if ( empty( $available ) && empty( $crosssell_pkgs ) && empty( $exhausted_pkgs ) ) return '';
 
-        $selected_id = (int) ( WC()->session ? WC()->session->get( self::SESSION_KEY ) : 0 );
-        $xsell_id    = (int) ( WC()->session ? WC()->session->get( self::SESSION_XSELL ) : 0 );
+        $dd_items    = self::get_dd_cart_items();
+        $selected_id = 0;
+        $xsell_id    = 0;
+        foreach ( $dd_items as $item ) {
+            if ( ( $item['dd_type'] ?? 'direct' ) === 'direct' ) {
+                $selected_id = (int) $item[ self::CART_ITEM_KEY ];
+            }
+            if ( ( $item['dd_type'] ?? 'direct' ) === 'crosssell' ) {
+                $xsell_id = (int) $item[ self::CART_ITEM_KEY ];
+            }
+        }
 
         ob_start();
         echo '<div class="dd-gift-section" id="dd-gift-section">';
@@ -391,65 +585,14 @@ class DD_Cart {
         $type       = sanitize_key( $_POST['type'] ?? 'direct' );
         $checked    = (bool) absint( $_POST['checked'] ?? 1 );
 
-        if ( $type === 'crosssell' ) {
-            WC()->session->set( self::SESSION_XSELL, $checked ? $package_id : 0 );
+        if ( $checked ) {
+            self::add_package_to_cart( $package_id, $type );
         } else {
-            WC()->session->set( self::SESSION_KEY, $checked ? $package_id : 0 );
+            self::remove_package_from_cart( $package_id, $type );
         }
 
         WC()->cart->calculate_totals();
         wp_send_json_success( [ 'html' => self::build_gift_html() ] );
-    }
-
-    // ── Update session z checkout ─────────────────────────────────────────────
-
-    public static function update_session_from_post( string $post_data ): void {
-        parse_str( $post_data, $fields );
-        if ( isset( $fields['dd_package_radio'] ) ) {
-            WC()->session->set( self::SESSION_KEY, (int) $fields['dd_package_radio'] );
-        }
-        WC()->session->set(
-            self::SESSION_XSELL,
-            ! empty( $fields['dd_crosssell_pkg'] ) ? (int) $fields['dd_crosssell_pkg'] : 0
-        );
-    }
-
-    // ── Fee ───────────────────────────────────────────────────────────────────
-
-    public static function apply_fee( WC_Cart $cart ): void {
-        if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
-        if ( ! WC()->session ) return;
-
-        $email = self::get_customer_email();
-
-        $add_fee = function ( int $pkg_id, string $suffix = '' ) use ( $cart, $email ) {
-            if ( $pkg_id <= 0 ) return;
-            $pkg = DD_Package::get( $pkg_id );
-            if ( ! $pkg || ! $pkg->active || (float) $pkg->price <= 0 ) return;
-
-            // První dárek zdarma – přeskoč fee
-            if ( DD_Package::is_first_free_eligible( $pkg_id, $email ) ) return;
-
-            $label = get_option( 'dd_checkbox_label', __( 'náhodný balíček', 'virtualni-balicek' ) );
-            $cart->add_fee( $label . $suffix, (float) $pkg->price, true );
-        };
-
-        $selected = (int) WC()->session->get( self::SESSION_KEY );
-        $xsell    = (int) WC()->session->get( self::SESSION_XSELL );
-
-        if ( $selected === -1 ) {
-            // Náhodný výběr – spočítej fee z prvního dostupného balíčku
-            $product_ids  = self::get_cart_product_ids();
-            $category_ids = DD_Package::get_category_ids_for_products( $product_ids );
-            $resolved     = DD_Package::resolve_for_cart( $product_ids, $category_ids );
-            if ( ! empty( $resolved['matched'] ) ) {
-                $add_fee( (int) $resolved['matched'][0]->id, ' 🎲' );
-            }
-        } else {
-            $add_fee( $selected );
-        }
-
-        if ( $xsell > 0 ) $add_fee( $xsell );
     }
 
     // ── CSS ───────────────────────────────────────────────────────────────────
