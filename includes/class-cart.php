@@ -455,12 +455,8 @@ class DD_Cart {
         }
 
         $selection_locked = $selected_id > 0 || $xsell_id > 0;
-        $has_exact_match  = ! empty( array_filter( $resolved['matched'], static function ( $pkg ) {
-            return ( $pkg->match_reason ?? '' ) === 'direct';
-        } ) );
-        // Fallback režim: v košíku není žádná přesná shoda pravidel, ale nějaké
-        // balíčky jsou stále dostupné (typicky univerzální / z jiných kategorií).
-        $fallback_mode    = ! $has_exact_match && ( ! empty( $available ) || ! empty( $crosssell_pkgs ) );
+        $has_exact_match  = self::has_direct_match( $resolved['matched'] );
+        $fallback_mode    = self::is_fallback_mode( $has_exact_match, $available, $crosssell_pkgs );
         $fallback_categories = self::available_fallback_categories( array_merge( $available, $crosssell_pkgs ) );
 
         ob_start();
@@ -715,6 +711,29 @@ class DD_Cart {
         $names = array_values( array_unique( array_filter( $names ) ) );
         sort( $names, SORT_NATURAL | SORT_FLAG_CASE );
         return $names;
+    }
+
+    /**
+     * @param object[] $matched_packages
+     */
+    private static function has_direct_match( array $matched_packages ): bool {
+        foreach ( $matched_packages as $pkg ) {
+            if ( ( $pkg->match_reason ?? '' ) === 'direct' ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param object[] $available
+     * @param object[] $crosssell_pkgs
+     */
+    private static function is_fallback_mode( bool $has_exact_match, array $available, array $crosssell_pkgs ): bool {
+        if ( $has_exact_match ) {
+            return false;
+        }
+        return ! empty( $available ) || ! empty( $crosssell_pkgs );
     }
 
     /**

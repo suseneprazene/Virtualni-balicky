@@ -97,7 +97,8 @@
 
     // ── Nahrání dokumentu ─────────────────────────────────────────────────────
     $('#dd-upload-btn').on('click', function () {
-        const files = Array.from(($('#dd-doc-file')[0] && $('#dd-doc-file')[0].files) || []);
+        const fileInput = $('#dd-doc-file')[0];
+        const files = Array.from((fileInput && fileInput.files) || []);
         const packageId = parseInt( $('#dd-pkg-id').val(), 10 );
         if (!files.length) { alert('Vyberte soubor.'); return; }
         if (!packageId || packageId <= 0) {
@@ -125,7 +126,7 @@
             success(res) {
                 progress.hide(); self.prop('disabled', false);
                 if (!res.success) { alert(res.data || DD.strings.error); return; }
-                const docs = (res.data && Array.isArray(res.data.documents) && res.data.documents.length)
+                const docs = (res.data && Array.isArray(res.data.documents))
                     ? res.data.documents
                     : [res.data];
                 docs.forEach(doc => appendDocRow(doc));
