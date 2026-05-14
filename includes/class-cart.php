@@ -31,6 +31,7 @@ class DD_Cart {
         add_filter( 'woocommerce_get_cart_item_from_session', [ __CLASS__, 'restore_cart_item_from_session' ], 10, 3 );
         add_action( 'woocommerce_before_calculate_totals',    [ __CLASS__, 'set_virtual_item_prices' ], 20 );
         add_filter( 'woocommerce_cart_item_name',             [ __CLASS__, 'cart_item_name' ], 10, 3 );
+        add_filter( 'woocommerce_cart_item_product',          [ __CLASS__, 'cart_item_product' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_price',            [ __CLASS__, 'cart_item_price' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_quantity',         [ __CLASS__, 'cart_item_quantity' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_subtotal',         [ __CLASS__, 'cart_item_subtotal' ], 10, 3 );
@@ -121,8 +122,7 @@ class DD_Cart {
 
     public static function make_virtual_product( object $pkg ): DD_Virtual_Product {
         $product = new DD_Virtual_Product( 0 );
-        $label   = (string) get_option( 'dd_checkbox_label', '' );
-        $name    = $label !== '' ? $label : (string) $pkg->name;
+        $name    = self::virtual_item_label( $pkg );
 
         $product->set_name( $name );
         $product->set_price( (float) $pkg->price );
@@ -263,8 +263,21 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
-        $label = get_option( 'dd_checkbox_label', __( 'Přidat náhodný balíček', 'virtualni-balicek' ) );
-        return '🎁 ' . esc_html( $label ) . ' – ' . esc_html( $pkg->name );
+        return '🎁 ' . esc_html( self::virtual_item_label( $pkg ) );
+    }
+
+    public static function cart_item_product( $product, array $cart_item, string $cart_item_key ) {
+        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
+            return $product;
+        }
+        if ( $product instanceof WC_Product && $product->exists() ) {
+            return $product;
+        }
+        $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
+        if ( ! $pkg || ! $pkg->active ) {
+            return $product;
+        }
+        return self::make_virtual_product( $pkg );
     }
 
     public static function cart_item_price( string $price_html, array $cart_item, string $cart_item_key ): string {
@@ -539,6 +552,23 @@ class DD_Cart {
         }
 
         return $pkg->name;
+    }
+
+    private static function virtual_item_label( object $pkg ): string {
+        $cart_product_ids = self::get_cart_product_ids();
+        $category         = self::category_label_for_package( $pkg, $cart_product_ids );
+        $base             = __( 'Virtuální balíček', 'virtualni-balicek' );
+
+        if ( $category ) {
+            return sprintf(
+                /* translators: %s: category label */
+                __( '%1$s z kategorie %2$s', 'virtualni-balicek' ),
+                $base,
+                $category
+            );
+        }
+
+        return $base . ' – ' . (string) $pkg->name;
     }
 
     /**
