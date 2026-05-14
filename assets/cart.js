@@ -95,8 +95,10 @@
 
         // Fallback pro případy, kdy Store API invalidate není dostupné
         if (!refreshed) {
-            console.warn('DD block cart refresh fallback: reloading page');
-            window.location.reload();
+            console.warn('DD block cart refresh: Store API invalidation unavailable, reloading page as fallback');
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 250);
         }
     }
 
