@@ -4,7 +4,7 @@
 
     var selectionInProgress = false;
     var packageIconFilename = 'package-icon.svg';
-    var packageLabelNeedle = ((DD_Cart && DD_Cart.package_label_needle) || 'Virtuální balíček').toLowerCase();
+    var packageLabelNeedle = ((DD_Cart && DD_Cart.package_label_needle) || '').toLowerCase();
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
     var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart-items', '.wc-block-cart'];
     var giftRowDebounceMs = 60;
@@ -66,7 +66,7 @@
             }
 
             var rowText = (row.textContent || '').toLowerCase();
-            if (rowText.indexOf(packageLabelNeedle) !== -1) {
+            if (packageLabelNeedle && rowText.indexOf(packageLabelNeedle) !== -1) {
                 row.classList.add('dd-cart-item');
             }
         });

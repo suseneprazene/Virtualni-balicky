@@ -256,10 +256,6 @@ class DD_Cart {
             return null;
         }
 
-        if ( isset( WC()->cart->cart_contents[ $cart_key ] ) ) {
-            WC()->cart->cart_contents[ $cart_key ]['data'] = $product;
-        }
-
         WC()->cart->set_session();
         return $cart_key;
     }
@@ -459,9 +455,9 @@ class DD_Cart {
         }
 
         $selection_locked = $selected_id > 0 || $xsell_id > 0;
-        $has_exact_match  = (bool) array_filter( $resolved['matched'], static function ( $pkg ) {
+        $has_exact_match  = ! empty( array_filter( $resolved['matched'], static function ( $pkg ) {
             return ( $pkg->match_reason ?? '' ) === 'direct';
-        } );
+        } ) );
         // Fallback režim: v košíku není žádná přesná shoda pravidel, ale nějaké
         // balíčky jsou stále dostupné (typicky univerzální / z jiných kategorií).
         $fallback_mode    = ! $has_exact_match && ( ! empty( $available ) || ! empty( $crosssell_pkgs ) );

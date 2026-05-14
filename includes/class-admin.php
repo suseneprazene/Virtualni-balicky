@@ -274,7 +274,9 @@ class DD_Admin {
         }
 
         return array_values( array_filter( $files, static function( array $f ): bool {
-            return ! empty( $f['name'] ) && ! empty( $f['tmp_name'] );
+            return ! empty( $f['name'] )
+                && ! empty( $f['tmp_name'] )
+                && (int) ( $f['error'] ?? UPLOAD_ERR_NO_FILE ) === UPLOAD_ERR_OK;
         } ) );
     }
 
@@ -305,7 +307,7 @@ class DD_Admin {
         finfo_close( $finfo );
 
         if ( ! in_array( $mime, $allowed, true ) ) {
-            return new WP_Error( 'mime_not_allowed', 'Nepodporovaný typ: ' . esc_html( (string) $mime ) );
+            return new WP_Error( 'mime_not_allowed', 'Nepodporovaný typ: ' . (string) $mime );
         }
         if ( (int) $file['size'] > 20 * 1024 * 1024 ) {
             return new WP_Error( 'file_too_large', 'Max 20 MB.' );
