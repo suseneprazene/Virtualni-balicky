@@ -31,6 +31,7 @@ class DD_Cart {
         add_filter( 'woocommerce_get_cart_item_from_session', [ __CLASS__, 'restore_cart_item_from_session' ], 10, 3 );
         add_action( 'woocommerce_before_calculate_totals',    [ __CLASS__, 'set_virtual_item_prices' ], 20 );
         add_filter( 'woocommerce_cart_item_name',             [ __CLASS__, 'cart_item_name' ], 10, 3 );
+        add_filter( 'woocommerce_cart_item_class',            [ __CLASS__, 'cart_item_class' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_product',          [ __CLASS__, 'cart_item_product' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_price',            [ __CLASS__, 'cart_item_price' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_quantity',         [ __CLASS__, 'cart_item_quantity' ], 10, 3 );
@@ -306,13 +307,13 @@ class DD_Cart {
             if ( ! isset( $item[ self::CART_ITEM_KEY ] ) || ! isset( $item['data'] ) || $item['data'] === false ) {
                 continue;
             }
-            if ( (int) ( $item['quantity'] ?? 1 ) !== 1 ) {
-                $cart->cart_contents[ $key ]['quantity'] = 1;
-            }
             $pkg_id = (int) $item[ self::CART_ITEM_KEY ];
             $pkg    = DD_Package::get( $pkg_id );
             if ( ! $pkg || ! $pkg->active ) {
                 continue;
+            }
+            if ( (int) ( $item['quantity'] ?? 1 ) !== 1 ) {
+                $cart->cart_contents[ $key ]['quantity'] = 1;
             }
             $price   = (float) $pkg->price;
             $is_free = $email ? DD_Package::is_first_free_eligible( $pkg_id, $email ) : false;
@@ -331,7 +332,15 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
-        return '<span class="dd-cart-item-label">🎁 ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>';
+        return '<span class="dd-cart-item-label" data-dd-gift-item="1">🎁 ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>';
+    }
+
+    public static function cart_item_class( string $class, array $cart_item, string $cart_item_key ): string {
+        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
+            return $class;
+        }
+
+        return trim( $class . ' dd-cart-item' );
     }
 
     /**

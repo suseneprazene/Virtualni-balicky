@@ -3,9 +3,11 @@
     'use strict';
 
     var selectionInProgress = false;
+    var quantityObserver = null;
 
     function init() {
         lockGiftQuantities();
+        setupQuantityObserver();
 
         // Přímé balíčky – vzájemné vylučování: zaškrtnutím jednoho se ostatní odškrtnou
         $(document).off('change.dd', '.dd-pkg-checkbox').on('change.dd', '.dd-pkg-checkbox', function () {
@@ -71,13 +73,38 @@
     }
 
     function isGiftRow(row) {
-        var html = (row.textContent || '').trim();
+        if (row.classList.contains('dd-cart-item')) {
+            return true;
+        }
+
+        if (row.querySelector('[data-dd-gift-item="1"]')) {
+            return true;
+        }
+
         var image = row.querySelector('img');
         var src = image ? (image.getAttribute('src') || '') : '';
 
-        return src.indexOf('package-icon') !== -1 ||
-            html.indexOf('Virtuální balíček') !== -1 ||
-            html.indexOf('🎁') !== -1;
+        return src.indexOf('package-icon') !== -1;
+    }
+
+    function setupQuantityObserver() {
+        var container = document.querySelector('form.woocommerce-cart-form, .wc-block-cart, .wc-block-cart-items');
+        if (!container) {
+            return;
+        }
+
+        if (quantityObserver) {
+            quantityObserver.disconnect();
+        }
+
+        quantityObserver = new MutationObserver(function () {
+            lockGiftQuantities();
+        });
+
+        quantityObserver.observe(container, {
+            childList: true,
+            subtree: true
+        });
     }
 
     function sendSelection(packageId, type, checked) {
@@ -195,14 +222,12 @@
     window.DD_Cart_init = init;
     $(function () {
         init();
-
-        var observer = new MutationObserver(function () {
-            lockGiftQuantities();
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
+        setupQuantityObserver();
+        window.addEventListener('beforeunload', function () {
+            if (quantityObserver) {
+                quantityObserver.disconnect();
+                quantityObserver = null;
+            }
         });
     });
 
