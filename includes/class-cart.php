@@ -266,6 +266,9 @@ class DD_Cart {
         return '🎁 ' . esc_html( self::virtual_item_label( $pkg ) );
     }
 
+    /**
+     * Zajistí produktový objekt pro DD virtuální položky v košíku.
+     */
     public static function cart_item_product( $product, array $cart_item, string $cart_item_key ) {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
             return $product;
@@ -554,6 +557,9 @@ class DD_Cart {
         return $pkg->name;
     }
 
+    /**
+     * Vytvoří popisek DD položky do řádku košíku včetně kategorie.
+     */
     private static function virtual_item_label( object $pkg ): string {
         $cart_product_ids = self::get_cart_product_ids();
         $category         = self::category_label_for_package( $pkg, $cart_product_ids );
