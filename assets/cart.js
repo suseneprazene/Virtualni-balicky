@@ -65,9 +65,11 @@
                 return;
             }
 
-            var rowText = (row.textContent || '').toLowerCase();
-            if (packageLabelNeedle && rowText.indexOf(packageLabelNeedle) !== -1) {
-                row.classList.add('dd-cart-item');
+            if (packageLabelNeedle) {
+                var rowText = (row.textContent || '').toLowerCase();
+                if (rowText.indexOf(packageLabelNeedle) !== -1) {
+                    row.classList.add('dd-cart-item');
+                }
             }
         });
     }

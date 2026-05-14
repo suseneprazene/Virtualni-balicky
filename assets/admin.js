@@ -126,6 +126,7 @@
             success(res) {
                 progress.hide(); self.prop('disabled', false);
                 if (!res.success) { alert(res.data || DD.strings.error); return; }
+                if (!res.data) { alert(DD.strings.error); return; }
                 const docs = (res.data && Array.isArray(res.data.documents))
                     ? res.data.documents
                     : [res.data];

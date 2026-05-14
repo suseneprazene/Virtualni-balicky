@@ -306,16 +306,20 @@ class DD_Admin {
         $mime  = finfo_file( $finfo, $file['tmp_name'] );
         finfo_close( $finfo );
 
-        if ( ! in_array( $mime, $allowed, true ) ) {
-            return new WP_Error( 'mime_not_allowed', 'Nepodporovaný typ: ' . (string) $mime );
+        $size = (int) $file['size'];
+        if ( $size <= 0 ) {
+            return new WP_Error( 'file_empty', 'Soubor je prázdný.' );
         }
-        if ( (int) $file['size'] > 20 * 1024 * 1024 ) {
+        if ( $size > 20 * 1024 * 1024 ) {
             return new WP_Error( 'file_too_large', 'Max 20 MB.' );
         }
 
         $ext = strtolower( (string) pathinfo( (string) $file['name'], PATHINFO_EXTENSION ) );
         if ( $ext === '' || ! in_array( $ext, $allowed_exts, true ) ) {
             return new WP_Error( 'extension_not_allowed', 'Nepodporovaná přípona souboru.' );
+        }
+        if ( ! in_array( $mime, $allowed, true ) ) {
+            return new WP_Error( 'mime_not_allowed', 'Nepodporovaný typ: ' . (string) $mime );
         }
 
         DD_Installer::create_upload_dir();
