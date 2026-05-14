@@ -222,13 +222,6 @@
     window.DD_Cart_init = init;
     $(function () {
         init();
-        setupQuantityObserver();
-        window.addEventListener('beforeunload', function () {
-            if (quantityObserver) {
-                quantityObserver.disconnect();
-                quantityObserver = null;
-            }
-        });
     });
 
 })(jQuery);
