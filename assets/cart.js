@@ -4,6 +4,7 @@
 
     var selectionInProgress = false;
     var packageIconFilename = 'package-icon.svg';
+    var packageLabelNeedle = 'virtuální balíček';
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
     var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart-items', '.wc-block-cart'];
     var giftRowDebounceMs = 60;
@@ -60,6 +61,12 @@
                 }
             }
             if (path.endsWith('/' + packageIconFilename) || path === packageIconFilename) {
+                row.classList.add('dd-cart-item');
+                return;
+            }
+
+            var rowText = (row.textContent || '').toLowerCase();
+            if (rowText.indexOf(packageLabelNeedle) !== -1) {
                 row.classList.add('dd-cart-item');
             }
         });

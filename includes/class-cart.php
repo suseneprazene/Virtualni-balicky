@@ -33,6 +33,7 @@ class DD_Cart {
         add_filter( 'woocommerce_cart_item_name',             [ __CLASS__, 'cart_item_name' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_class',            [ __CLASS__, 'cart_item_class' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_product',          [ __CLASS__, 'cart_item_product' ], 10, 3 );
+        add_filter( 'woocommerce_cart_item_thumbnail',        [ __CLASS__, 'cart_item_thumbnail' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_price',            [ __CLASS__, 'cart_item_price' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_quantity',         [ __CLASS__, 'cart_item_quantity' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_subtotal',         [ __CLASS__, 'cart_item_subtotal' ], 10, 3 );
@@ -236,27 +237,29 @@ class DD_Cart {
         $product  = self::make_virtual_product( $pkg );
         $product->set_price( $price );
         $prod_id  = $product->get_id(); // set by make_virtual_product via placeholder
-        $cart_key = WC()->cart->generate_cart_id( $prod_id, 0, 0, [ self::CART_ITEM_KEY => $pkg_id, 'dd_type' => $type ] );
+        if ( $prod_id <= 0 ) {
+            return null;
+        }
 
-        WC()->cart->cart_contents[ $cart_key ] = [
-            'key'               => $cart_key,
-            'product_id'        => $prod_id,
-            'variation_id'      => 0,
-            'variation'         => [],
-            'quantity'          => 1,
-            'data'              => $product,
-            'data_hash'         => wc_get_cart_item_data_hash( $product ),
-            self::CART_ITEM_KEY => $pkg_id,
-            'dd_type'           => $type,
-            'line_tax_data'     => [ 'subtotal' => [], 'total' => [] ],
-            'line_subtotal'     => $price,
-            'line_subtotal_tax' => 0,
-            'line_total'        => $price,
-            'line_tax'          => 0,
-        ];
+        $cart_key = WC()->cart->add_to_cart(
+            $prod_id,
+            1,
+            0,
+            [],
+            [
+                self::CART_ITEM_KEY => $pkg_id,
+                'dd_type'           => $type,
+            ]
+        );
+        if ( ! $cart_key ) {
+            return null;
+        }
+
+        if ( isset( WC()->cart->cart_contents[ $cart_key ] ) ) {
+            WC()->cart->cart_contents[ $cart_key ]['data'] = $product;
+        }
 
         WC()->cart->set_session();
-
         return $cart_key;
     }
 
@@ -371,6 +374,14 @@ class DD_Cart {
         return self::make_virtual_product( $pkg );
     }
 
+    public static function cart_item_thumbnail( string $thumbnail, array $cart_item, string $cart_item_key ): string {
+        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
+            return $thumbnail;
+        }
+        $icon = DD_PLUGIN_URL . 'assets/package-icon.svg';
+        return '<img src="' . esc_url( $icon ) . '" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="" loading="lazy" decoding="async" />';
+    }
+
     public static function cart_item_price( string $price_html, array $cart_item, string $cart_item_key ): string {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $price_html;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
@@ -398,6 +409,9 @@ class DD_Cart {
         $category_ids = DD_Package::get_category_ids_for_products( $product_ids );
         $resolved     = DD_Package::resolve_for_cart( $product_ids, $category_ids );
         $email        = self::get_customer_email();
+        $exact_matches = array_values( array_filter( $resolved['matched'], static function ( $pkg ) {
+            return ( $pkg->match_reason ?? '' ) === 'direct';
+        } ) );
 
         $available = array_values( array_filter( $resolved['matched'], function ( $pkg ) use ( $email ) {
             if ( ! $email ) return true;
@@ -447,8 +461,13 @@ class DD_Cart {
             WC()->session->set( self::SESSION_XSELL, $xsell_id );
         }
 
+        $selection_locked = $selected_id > 0 || $xsell_id > 0;
+        $has_exact_match  = ! empty( $exact_matches );
+        $fallback_mode    = ! $has_exact_match && ( ! empty( $available ) || ! empty( $crosssell_pkgs ) );
+        $fallback_categories = self::available_fallback_categories( array_merge( $available, $crosssell_pkgs ) );
+
         ob_start();
-        echo '<div class="dd-gift-section" id="dd-gift-section">';
+        echo '<div class="dd-gift-section' . ( $selection_locked ? ' dd-gift-locked' : '' ) . '" id="dd-gift-section">';
         echo '<h3 class="dd-gift-heading">🎁 ' . esc_html__( 'Náhodný balíček', 'virtualni-balicek' )
             . ' <button type="button" class="dd-info-btn" aria-label="' . esc_attr__( 'Co je náhodný balíček?', 'virtualni-balicek' ) . '">?</button></h3>';
 
@@ -470,14 +489,37 @@ class DD_Cart {
         echo '</ul>';
         echo '</div>';
 
+        if ( $fallback_mode ) {
+            echo '<div class="dd-gift-row dd-gift-fallback">';
+            echo '<p class="dd-gift-fallback-msg">' . esc_html__(
+                'Pro daný produkt v kategorii pro Tebe nemám Náhodný balíček k dispozici, ale můžeš si vybrat Náhodný balíček z jiných dostupných kategorií:',
+                'virtualni-balicek'
+            ) . '</p>';
+            if ( ! empty( $fallback_categories ) ) {
+                echo '<ul class="dd-gift-fallback-cats">';
+                foreach ( $fallback_categories as $cat_name ) {
+                    echo '<li>' . esc_html( $cat_name ) . '</li>';
+                }
+                echo '</ul>';
+            }
+            echo '</div>';
+        }
+
+        if ( $selection_locked ) {
+            echo '<p class="dd-gift-lock-msg">' . esc_html__(
+                'Balíček je už v košíku. Pro změnu výběru nejdřív odeber balíček z košíku.',
+                'virtualni-balicek'
+            ) . '</p>';
+        }
+
         // Přímé balíčky – každý jako samostatný checkbox, vzájemně se vylučující
         if ( ! empty( $available ) ) {
-            self::render_direct_packages( $available, $selected_id, $email, $product_ids, $category_ids );
+            self::render_direct_packages( $available, $selected_id, $email, $product_ids, $selection_locked );
         }
 
         // Cross-sell
         foreach ( $crosssell_pkgs as $pkg ) {
-            self::render_crosssell_checkbox( $pkg, $xsell_id === (int) $pkg->id );
+            self::render_crosssell_checkbox( $pkg, $xsell_id === (int) $pkg->id, $selection_locked );
         }
 
         // Vyčerpané
@@ -587,7 +629,7 @@ class DD_Cart {
         int $selected_id,
         string $email,
         array $product_ids,
-        array $category_ids
+        bool $selection_locked
     ): void {
         $description = get_option( 'dd_cart_description', 'Překvapení čeká – obsah balíčku zjistíš až v e-mailu po objednávce.' );
         $multiple    = count( $packages ) > 1;
@@ -610,7 +652,8 @@ class DD_Cart {
                 . ' class="dd-pkg-checkbox dd-pkg-direct"'
                 . ' data-package="' . esc_attr( $pkg->id ) . '"'
                 . ' data-type="direct"'
-                . ( $selected_id === (int) $pkg->id ? ' checked' : '' ) . '>';
+                . ( $selected_id === (int) $pkg->id ? ' checked' : '' )
+                . ( $selection_locked ? ' disabled' : '' ) . '>';
             echo '<span>' . esc_html( $line_label ) . self::price_text_html( $pkg, $ff ) . '</span>'; // phpcs:ignore
             echo '</label>';
             echo '</div>';
@@ -662,6 +705,40 @@ class DD_Cart {
     }
 
     /**
+     * @param object[] $packages
+     * @return string[]
+     */
+    private static function available_fallback_categories( array $packages ): array {
+        $names = [];
+        foreach ( $packages as $pkg ) {
+            foreach ( self::package_category_names( $pkg ) as $name ) {
+                $names[] = $name;
+            }
+        }
+        $names = array_values( array_unique( array_filter( $names ) ) );
+        sort( $names, SORT_NATURAL | SORT_FLAG_CASE );
+        return $names;
+    }
+
+    /**
+     * @return string[]
+     */
+    private static function package_category_names( object $pkg ): array {
+        $names = [];
+        $rules = DD_Package::get_rules( (int) $pkg->id );
+        foreach ( $rules as $rule ) {
+            if ( ( $rule->rule_type ?? '' ) !== 'category' ) {
+                continue;
+            }
+            $term = get_term( (int) $rule->object_id, 'product_cat' );
+            if ( $term && ! is_wp_error( $term ) ) {
+                $names[] = $term->name;
+            }
+        }
+        return $names;
+    }
+
+    /**
      * Vytvoří popisek DD položky do řádku košíku včetně kategorie.
      *
      * @param object $pkg Balíček DD.
@@ -700,7 +777,7 @@ class DD_Cart {
         return ' <span class="dd-price">(+' . wp_strip_all_tags( wc_price( $pkg->price ) ) . ')</span>';
     }
 
-    private static function render_crosssell_checkbox( object $pkg, bool $checked ): void {
+    private static function render_crosssell_checkbox( object $pkg, bool $checked, bool $selection_locked ): void {
         $email    = self::get_customer_email();
         $ff       = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
         $template = get_option( 'dd_crosssell_label', 'Zajímá tě také náhodný balíček ze sekce {package_name}?' );
@@ -712,6 +789,7 @@ class DD_Cart {
                        class="dd-pkg-checkbox"
                        data-package="<?php echo esc_attr( $pkg->id ); ?>"
                        data-type="crosssell"
+                       <?php disabled( $selection_locked ); ?>
                        <?php checked( $checked ); ?>>
                 <span><?php echo esc_html( $label ); ?><?php echo self::price_text_html( $pkg, $ff ); // phpcs:ignore ?></span>
             </label>
@@ -793,6 +871,13 @@ class DD_Cart {
         .dd-gift-row:last-child{margin-bottom:0;}
         .dd-gift-label{display:flex;align-items:flex-start;gap:.5em;cursor:pointer;font-weight:600;}
         .dd-gift-label input{margin-top:.2em;width:1.1em;height:1.1em;flex-shrink:0;}
+        .dd-gift-label input:disabled{cursor:not-allowed;}
+        .dd-gift-locked .dd-gift-label{opacity:.6;cursor:not-allowed;}
+        .dd-gift-lock-msg{margin:.3em 0 .8em;color:#8a6d3b;font-size:.95em;}
+        .dd-gift-fallback{margin:.3em 0 .9em;padding:.65em .8em;border:1px solid #f0d8a8;border-radius:6px;background:#fff7e8;}
+        .dd-gift-fallback-msg{margin:0 0 .45em;font-weight:600;color:#7a5500;}
+        .dd-gift-fallback-cats{margin:0;padding-left:1.2em;color:#6d5b3d;}
+        .dd-gift-fallback-cats li{margin:.1em 0;}
         .dd-gift-desc{margin:.4em 0 0 0;color:#555;}
         .dd-gift-intro{margin:0 0 .5em;font-weight:600;}
         .dd-gift-crosssell{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.6em;}

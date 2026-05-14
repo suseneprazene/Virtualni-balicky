@@ -97,9 +97,9 @@
 
     // ── Nahrání dokumentu ─────────────────────────────────────────────────────
     $('#dd-upload-btn').on('click', function () {
-        const file = $('#dd-doc-file')[0].files[0];
+        const files = Array.from(($('#dd-doc-file')[0] && $('#dd-doc-file')[0].files) || []);
         const packageId = parseInt( $('#dd-pkg-id').val(), 10 );
-        if (!file) { alert('Vyberte soubor.'); return; }
+        if (!files.length) { alert('Vyberte soubor.'); return; }
         if (!packageId || packageId <= 0) {
             // Balíček ještě nebyl uložen – zkus ho uložit automaticky
             const name = $('#dd-pkg-name').val().trim();
@@ -115,17 +115,25 @@
         fd.append('action', 'dd_upload_document');
         fd.append('nonce', DD.nonce);
         fd.append('package_id', packageId);
-        fd.append('doc_name', $('#dd-doc-name').val().trim() || file.name);
-        fd.append('file', file);
+        fd.append('doc_name', $('#dd-doc-name').val().trim());
+        files.forEach(file => fd.append('files[]', file));
+        if (files.length === 1) {
+            fd.append('file', files[0]);
+        }
 
         $.ajax({ url: DD.ajax_url, type: 'POST', data: fd, processData: false, contentType: false,
             success(res) {
                 progress.hide(); self.prop('disabled', false);
                 if (!res.success) { alert(res.data || DD.strings.error); return; }
-                appendDocRow(res.data);
+                const docs = (res.data && Array.isArray(res.data.documents) && res.data.documents.length)
+                    ? res.data.documents
+                    : [res.data];
+                docs.forEach(doc => appendDocRow(doc));
                 $('#dd-doc-name').val(''); $('#dd-doc-file').val('');
-                updateDocCount(1);
-                showNotice('success', `Dokument „${res.data.name}" nahrán.`);
+                updateDocCount(docs.length);
+                showNotice('success', docs.length > 1
+                    ? `Nahráno dokumentů: ${docs.length}.`
+                    : `Dokument „${docs[0].name}" nahrán.`);
             },
             error() { progress.hide(); self.prop('disabled', false); alert(DD.strings.error); }
         });

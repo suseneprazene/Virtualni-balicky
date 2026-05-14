@@ -202,36 +202,142 @@ class DD_Admin {
 
         $package_id = absint( $_POST['package_id'] ?? 0 );
         if ( ! $package_id ) wp_send_json_error( 'Chybí ID balíčku.' );
-        if ( empty( $_FILES['file'] ) ) wp_send_json_error( 'Žádný soubor.' );
+        $files = self::normalize_uploaded_files();
+        if ( empty( $files ) ) wp_send_json_error( 'Žádný soubor.' );
 
-        $allowed = [ 'application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-                     'application/zip', 'application/epub+zip', 'text/plain',
-                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ];
+        $doc_name_input = sanitize_text_field( $_POST['doc_name'] ?? '' );
+        $documents      = [];
+        $errors         = [];
 
-        $file  = $_FILES['file'];
+        foreach ( $files as $index => $file ) {
+            $doc_name = '';
+            if ( count( $files ) === 1 && $doc_name_input !== '' ) {
+                $doc_name = $doc_name_input;
+            } elseif ( $doc_name_input !== '' ) {
+                $doc_name = $doc_name_input . ' #' . ( $index + 1 );
+            }
+
+            $result = self::store_uploaded_document( $package_id, $file, $doc_name );
+            if ( is_wp_error( $result ) ) {
+                $errors[] = $result->get_error_message();
+                continue;
+            }
+            $documents[] = $result;
+        }
+
+        if ( empty( $documents ) ) {
+            wp_send_json_error( implode( ' ', $errors ) ?: 'Nahrání souboru selhalo.' );
+        }
+
+        $response = [
+            'documents' => $documents,
+            'errors'    => $errors,
+        ];
+
+        if ( count( $documents ) === 1 ) {
+            $response = array_merge( $response, $documents[0] );
+        }
+
+        wp_send_json_success( $response );
+    }
+
+    /**
+     * @return array<int, array{name:string,type:string,tmp_name:string,error:int,size:int}>
+     */
+    private static function normalize_uploaded_files(): array {
+        $files = [];
+
+        if ( ! empty( $_FILES['files'] ) && is_array( $_FILES['files']['name'] ?? null ) ) {
+            $count = count( (array) $_FILES['files']['name'] );
+            for ( $i = 0; $i < $count; $i++ ) {
+                $files[] = [
+                    'name'     => (string) ( $_FILES['files']['name'][ $i ] ?? '' ),
+                    'type'     => (string) ( $_FILES['files']['type'][ $i ] ?? '' ),
+                    'tmp_name' => (string) ( $_FILES['files']['tmp_name'][ $i ] ?? '' ),
+                    'error'    => (int) ( $_FILES['files']['error'][ $i ] ?? UPLOAD_ERR_NO_FILE ),
+                    'size'     => (int) ( $_FILES['files']['size'][ $i ] ?? 0 ),
+                ];
+            }
+        } elseif ( ! empty( $_FILES['file'] ) && is_array( $_FILES['file'] ) ) {
+            $files[] = [
+                'name'     => (string) ( $_FILES['file']['name'] ?? '' ),
+                'type'     => (string) ( $_FILES['file']['type'] ?? '' ),
+                'tmp_name' => (string) ( $_FILES['file']['tmp_name'] ?? '' ),
+                'error'    => (int) ( $_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE ),
+                'size'     => (int) ( $_FILES['file']['size'] ?? 0 ),
+            ];
+        }
+
+        return array_values( array_filter( $files, static function( array $f ): bool {
+            return ! empty( $f['name'] ) || ! empty( $f['tmp_name'] );
+        } ) );
+    }
+
+    /**
+     * @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file
+     * @return array{id:int,name:string,file_type:string,size:string}|WP_Error
+     */
+    private static function store_uploaded_document( int $package_id, array $file, string $doc_name = '' ) {
+        if ( (int) ( $file['error'] ?? UPLOAD_ERR_NO_FILE ) !== UPLOAD_ERR_OK ) {
+            return new WP_Error( 'upload_error', __( 'Chyba nahrání souboru.', 'virtualni-balicek' ) );
+        }
+
+        $allowed = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'application/zip',
+            'application/epub+zip',
+            'text/plain',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+
         $finfo = finfo_open( FILEINFO_MIME_TYPE );
         $mime  = finfo_file( $finfo, $file['tmp_name'] );
         finfo_close( $finfo );
 
-        if ( ! in_array( $mime, $allowed, true ) ) wp_send_json_error( 'Nepodporovaný typ: ' . esc_html( $mime ) );
-        if ( $file['size'] > 20 * 1024 * 1024 ) wp_send_json_error( 'Max 20 MB.' );
+        if ( ! in_array( $mime, $allowed, true ) ) {
+            return new WP_Error( 'mime_not_allowed', 'Nepodporovaný typ: ' . esc_html( (string) $mime ) );
+        }
+        if ( (int) $file['size'] > 20 * 1024 * 1024 ) {
+            return new WP_Error( 'file_too_large', 'Max 20 MB.' );
+        }
 
         DD_Installer::create_upload_dir();
         $dir      = DD_Installer::get_upload_dir();
-        $ext      = pathinfo( $file['name'], PATHINFO_EXTENSION );
-        $filename = 'pkg' . $package_id . '_' . uniqid() . '.' . strtolower( $ext );
+        $ext      = pathinfo( (string) $file['name'], PATHINFO_EXTENSION );
+        $filename = 'pkg' . $package_id . '_' . uniqid() . ( $ext ? '.' . strtolower( $ext ) : '' );
         $dest     = $dir . '/' . $filename;
 
-        if ( ! move_uploaded_file( $file['tmp_name'], $dest ) ) wp_send_json_error( 'Nelze uložit soubor.' );
+        if ( ! move_uploaded_file( $file['tmp_name'], $dest ) ) {
+            return new WP_Error( 'file_save_failed', 'Nelze uložit soubor.' );
+        }
 
-        $doc_name = sanitize_text_field( $_POST['doc_name'] ?? pathinfo( $file['name'], PATHINFO_FILENAME ) );
+        $final_name = $doc_name !== ''
+            ? sanitize_text_field( $doc_name )
+            : sanitize_text_field( pathinfo( (string) $file['name'], PATHINFO_FILENAME ) );
 
         global $wpdb;
-        $wpdb->insert( $wpdb->prefix . 'dd_documents',
-            [ 'package_id' => $package_id, 'name' => $doc_name, 'file_path' => $dest, 'file_type' => $mime ],
-            [ '%d', '%s', '%s', '%s' ] );
+        $inserted = $wpdb->insert(
+            $wpdb->prefix . 'dd_documents',
+            [ 'package_id' => $package_id, 'name' => $final_name, 'file_path' => $dest, 'file_type' => $mime ],
+            [ '%d', '%s', '%s', '%s' ]
+        );
+        if ( $inserted === false ) {
+            if ( file_exists( $dest ) ) {
+                unlink( $dest );
+            }
+            return new WP_Error( 'db_insert_failed', 'Chyba při ukládání dokumentu.' );
+        }
 
-        wp_send_json_success( [ 'id' => $wpdb->insert_id, 'name' => $doc_name, 'file_type' => $mime, 'size' => size_format( $file['size'] ) ] );
+        return [
+            'id'        => (int) $wpdb->insert_id,
+            'name'      => $final_name,
+            'file_type' => (string) $mime,
+            'size'      => size_format( (int) $file['size'] ),
+        ];
     }
 
     public static function ajax_delete_document(): void {
