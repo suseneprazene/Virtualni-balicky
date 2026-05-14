@@ -632,7 +632,7 @@ class DD_Cart {
             wc_load_cart();
         }
         if ( ! WC()->cart ) {
-            wp_send_json_error( [ 'message' => 'Košík není dostupný.' ] );
+            wp_send_json_error( [ 'message' => __( 'Košík není dostupný.', 'virtualni-balicek' ) ] );
         }
 
         $package_id = (int) ( $_POST['package_id'] ?? 0 );
@@ -641,13 +641,13 @@ class DD_Cart {
         $checked    = (bool) absint( $_POST['checked'] ?? 1 );
 
         if ( $package_id <= 0 ) {
-            wp_send_json_error( [ 'message' => 'Neplatné ID balíčku.' ] );
+            wp_send_json_error( [ 'message' => __( 'Neplatné ID balíčku.', 'virtualni-balicek' ) ] );
         }
 
         if ( $checked ) {
             $cart_key = self::add_package_to_cart( $package_id, $type );
             if ( ! $cart_key ) {
-                wp_send_json_error( [ 'message' => 'Balíček se nepodařilo přidat do košíku.' ] );
+                wp_send_json_error( [ 'message' => __( 'Balíček se nepodařilo přidat do košíku.', 'virtualni-balicek' ) ] );
             }
         } else {
             self::remove_package_from_cart( $package_id, $type );
