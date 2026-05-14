@@ -58,14 +58,7 @@
     }
 
     function setupGiftRowObserver() {
-        var root = null;
-        for (var i = 0; i < cartRootSelectors.length; i += 1) {
-            var selector = cartRootSelectors[i];
-            root = document.querySelector(selector);
-            if (root) {
-                break;
-            }
-        }
+        var root = findFirstCartRoot();
         if (!root) {
             return;
         }
@@ -85,6 +78,16 @@
             childList: true,
             subtree: true
         });
+    }
+
+    function findFirstCartRoot() {
+        for (var i = 0; i < cartRootSelectors.length; i += 1) {
+            var root = document.querySelector(cartRootSelectors[i]);
+            if (root) {
+                return root;
+            }
+        }
+        return null;
     }
 
     function sendSelection(packageId, type, checked) {
