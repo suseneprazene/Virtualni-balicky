@@ -51,7 +51,15 @@
 
             var image = row.querySelector('img');
             var src = image ? (image.getAttribute('src') || '') : '';
-            if (src.indexOf(packageIconFilename) !== -1) {
+            var path = '';
+            if (src) {
+                try {
+                    path = new URL(src, window.location.origin).pathname || '';
+                } catch (e) {
+                    path = src;
+                }
+            }
+            if (path.endsWith('/' + packageIconFilename) || path === packageIconFilename) {
                 row.classList.add('dd-cart-item');
             }
         });
