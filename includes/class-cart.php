@@ -312,7 +312,7 @@ class DD_Cart {
             if ( ! $pkg || ! $pkg->active ) {
                 continue;
             }
-            if ( (int) ( $item['quantity'] ?? 0 ) !== 1 ) {
+            if ( ! isset( $item['quantity'] ) || (int) $item['quantity'] !== 1 ) {
                 $cart->cart_contents[ $key ]['quantity'] = 1;
             }
             $price   = (float) $pkg->price;

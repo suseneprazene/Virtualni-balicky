@@ -4,6 +4,7 @@
 
     var selectionInProgress = false;
     var quantityObserver = null;
+    var quantityLockTimer = null;
 
     function init() {
         lockGiftQuantities();
@@ -84,7 +85,8 @@
         var image = row.querySelector('img');
         var src = image ? (image.getAttribute('src') || '') : '';
 
-        return src.indexOf('package-icon') !== -1;
+        return src.indexOf('/virtualni-balicek/package-icon.svg') !== -1 ||
+            src.indexOf('package-icon.svg') !== -1;
     }
 
     function setupQuantityObserver() {
@@ -98,7 +100,14 @@
         }
 
         quantityObserver = new MutationObserver(function () {
-            lockGiftQuantities();
+            if (quantityLockTimer) {
+                window.clearTimeout(quantityLockTimer);
+            }
+
+            quantityLockTimer = window.setTimeout(function () {
+                lockGiftQuantities();
+                quantityLockTimer = null;
+            }, 50);
         });
 
         quantityObserver.observe(container, {
