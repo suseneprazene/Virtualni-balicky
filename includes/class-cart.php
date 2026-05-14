@@ -333,7 +333,7 @@ class DD_Cart {
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
         $icon = DD_PLUGIN_URL . 'assets/package-icon.svg';
-        $icon_alt = __( 'Ikona balíčku', 'virtualni-balicek' );
+        $icon_alt = __( 'Virtuální dárkový balíček', 'virtualni-balicek' );
         return wp_kses_post(
             '<span class="dd-cart-item-label" data-dd-gift-item="1"><img class="dd-cart-item-icon" src="' . esc_url( $icon ) . '" alt="' . esc_attr( $icon_alt ) . '" loading="lazy" decoding="async" /> ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
         );
