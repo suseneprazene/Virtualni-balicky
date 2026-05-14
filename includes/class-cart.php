@@ -268,6 +268,14 @@ class DD_Cart {
 
     /**
      * Zajistí produktový objekt pro DD virtuální položky v košíku.
+     *
+     * Rekonstruuje DD_Virtual_Product ve chvíli, kdy WooCommerce předá
+     * chybějící nebo neplatný produktový objekt pro naši custom položku.
+     *
+     * @param mixed  $product       Produkt předaný WooCommerce.
+     * @param array  $cart_item     Data řádku košíku.
+     * @param string $cart_item_key Klíč řádku košíku.
+     * @return mixed
      */
     public static function cart_item_product( $product, array $cart_item, string $cart_item_key ) {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
@@ -559,6 +567,9 @@ class DD_Cart {
 
     /**
      * Vytvoří popisek DD položky do řádku košíku včetně kategorie.
+     *
+     * @param object $pkg Balíček DD.
+     * @return string
      */
     private static function virtual_item_label( object $pkg ): string {
         $cart_product_ids = self::get_cart_product_ids();
