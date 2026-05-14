@@ -142,9 +142,10 @@ class DD_Installer {
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        $upload    = wp_upload_dir();
-        $dest_dir  = $upload['basedir'] . '/virtualni-balicek';
-        $dest_file = $dest_dir . '/package-icon.svg';
+        $upload       = wp_upload_dir();
+        $icon_subdir  = 'virtualni-balicek';
+        $dest_dir     = $upload['basedir'] . '/' . $icon_subdir;
+        $dest_file    = $dest_dir . '/package-icon.svg';
 
         if ( ! is_dir( $dest_dir ) ) {
             wp_mkdir_p( $dest_dir );
@@ -156,7 +157,7 @@ class DD_Installer {
 
         $wp_filetype  = wp_check_filetype( 'package-icon.svg', [ 'svg' => 'image/svg+xml' ] );
         $attachment   = [
-            'guid'           => $upload['baseurl'] . '/virtualni-balicek/package-icon.svg',
+            'guid'           => $upload['baseurl'] . '/' . $icon_subdir . '/package-icon.svg',
             'post_mime_type' => $wp_filetype['type'] ?: 'image/svg+xml',
             'post_title'     => __( 'Virtuální balíček – ikona', 'virtualni-balicek' ),
             'post_content'   => '',
@@ -167,7 +168,8 @@ class DD_Installer {
             return;
         }
 
-        wp_generate_attachment_metadata( $attach_id, $dest_file );
+        $attach_data = wp_generate_attachment_metadata( $attach_id, $dest_file );
+        wp_update_attachment_metadata( $attach_id, $attach_data );
         set_post_thumbnail( $product_id, $attach_id );
         update_option( 'dd_placeholder_thumbnail_id', $attach_id );
     }
