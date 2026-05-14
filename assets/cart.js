@@ -5,6 +5,8 @@
     var selectionInProgress = false;
 
     function init() {
+        lockGiftQuantities();
+
         // Přímé balíčky – vzájemné vylučování: zaškrtnutím jednoho se ostatní odškrtnou
         $(document).off('change.dd', '.dd-pkg-checkbox').on('change.dd', '.dd-pkg-checkbox', function () {
             var $this = $(this);
@@ -29,6 +31,53 @@
         $(document).off('change.dd', '.dd-pkg-radio').on('change.dd', '.dd-pkg-radio', function () {
             sendSelection($(this).val(), $(this).data('type') || 'direct', 1);
         });
+    }
+
+    function lockGiftQuantities() {
+        var selectors = [
+            'tr.cart_item',
+            '.wc-block-cart-items__row',
+            '.wc-block-components-order-summary-item',
+            'li.wc-block-cart-items__row'
+        ];
+
+        document.querySelectorAll(selectors.join(',')).forEach(function (row) {
+            if (!isGiftRow(row)) {
+                return;
+            }
+
+            row.classList.add('dd-cart-item');
+
+            row.querySelectorAll(
+                '.plus, .minus, .qty, .quantity, .wc-block-components-quantity-selector, .wc-block-cart-item__quantity'
+            ).forEach(function (el) {
+                el.style.display = 'none';
+            });
+
+            if (!row.querySelector('.dd-fixed-qty')) {
+                var qty = document.createElement('span');
+                qty.className = 'dd-fixed-qty';
+                qty.textContent = '1 ks';
+
+                var target =
+                    row.querySelector('.product-quantity') ||
+                    row.querySelector('.wc-block-components-product-details') ||
+                    row.querySelector('.wc-block-cart-item__wrap') ||
+                    row;
+
+                target.appendChild(qty);
+            }
+        });
+    }
+
+    function isGiftRow(row) {
+        var html = (row.textContent || '').trim();
+        var image = row.querySelector('img');
+        var src = image ? (image.getAttribute('src') || '') : '';
+
+        return src.indexOf('package-icon') !== -1 ||
+            html.indexOf('Virtuální balíček') !== -1 ||
+            html.indexOf('🎁') !== -1;
     }
 
     function sendSelection(packageId, type, checked) {
@@ -125,6 +174,7 @@
 
             // Re-bind DD event listeners on the replaced DOM.
             init();
+            lockGiftQuantities();
             $(document.body).trigger('wc_fragment_refresh');
         }).fail(function () {
             // Fallback to the standard WC event.
@@ -139,9 +189,21 @@
         tmp.innerHTML = html;
         var newSection = tmp.querySelector('#dd-gift-section');
         if (newSection) existing.replaceWith(newSection);
+        lockGiftQuantities();
     }
 
     window.DD_Cart_init = init;
-    $(function () { init(); });
+    $(function () {
+        init();
+
+        var observer = new MutationObserver(function () {
+            lockGiftQuantities();
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    });
 
 })(jQuery);

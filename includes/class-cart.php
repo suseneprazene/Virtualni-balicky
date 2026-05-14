@@ -306,6 +306,9 @@ class DD_Cart {
             if ( ! isset( $item[ self::CART_ITEM_KEY ] ) || ! isset( $item['data'] ) || $item['data'] === false ) {
                 continue;
             }
+            if ( (int) ( $item['quantity'] ?? 1 ) !== 1 ) {
+                $cart->cart_contents[ $key ]['quantity'] = 1;
+            }
             $pkg_id = (int) $item[ self::CART_ITEM_KEY ];
             $pkg    = DD_Package::get( $pkg_id );
             if ( ! $pkg || ! $pkg->active ) {
@@ -328,7 +331,7 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
-        return '🎁 ' . esc_html( self::virtual_item_label( $pkg ) );
+        return '<span class="dd-cart-item-label">🎁 ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>';
     }
 
     /**
@@ -822,6 +825,15 @@ class DD_Cart {
             display:inline !important;
         }
         .dd-info-close:hover{color:#333 !important;background:none !important;box-shadow:none !important;}
+        .dd-fixed-qty{display:inline-block;font-weight:600;white-space:nowrap;}
+        .dd-cart-item .product-quantity input.qty,
+        .dd-cart-item .product-quantity .quantity,
+        .dd-cart-item .product-quantity .plus,
+        .dd-cart-item .product-quantity .minus,
+        .dd-cart-item .wc-block-components-quantity-selector,
+        .dd-cart-item .wc-block-cart-item__quantity{
+            display:none !important;
+        }
         ';
     }
 }
