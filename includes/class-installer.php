@@ -79,6 +79,7 @@ class DD_Installer {
     public static function get_or_create_placeholder_product(): int {
         $stored = (int) get_option( 'dd_placeholder_product_id', 0 );
         if ( $stored > 0 && wc_get_product( $stored ) ) {
+            self::set_placeholder_thumbnail( $stored );
             return $stored;
         }
 
@@ -87,6 +88,7 @@ class DD_Installer {
             $by_sku = wc_get_product_id_by_sku( 'dd-bundle-placeholder' );
             if ( $by_sku > 0 ) {
                 update_option( 'dd_placeholder_product_id', $by_sku );
+                self::set_placeholder_thumbnail( $by_sku );
                 return $by_sku;
             }
         }

@@ -3,8 +3,14 @@
     'use strict';
 
     var selectionInProgress = false;
+    var iconFragment = 'package-icon.svg';
+    var giftRowObserver = null;
+    var giftRowTimer = null;
 
     function init() {
+        markGiftRows();
+        setupGiftRowObserver();
+
         // Přímé balíčky – vzájemné vylučování: zaškrtnutím jednoho se ostatní odškrtnou
         $(document).off('change.dd', '.dd-pkg-checkbox').on('change.dd', '.dd-pkg-checkbox', function () {
             var $this = $(this);
@@ -28,6 +34,48 @@
 
         $(document).off('change.dd', '.dd-pkg-radio').on('change.dd', '.dd-pkg-radio', function () {
             sendSelection($(this).val(), $(this).data('type') || 'direct', 1);
+        });
+    }
+
+    function markGiftRows() {
+        var rows = document.querySelectorAll(
+            'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item'
+        );
+
+        rows.forEach(function (row) {
+            if (row.querySelector('[data-dd-gift-item="1"]')) {
+                row.classList.add('dd-cart-item');
+                return;
+            }
+
+            var image = row.querySelector('img');
+            var src = image ? (image.getAttribute('src') || '') : '';
+            if (src.indexOf(iconFragment) !== -1) {
+                row.classList.add('dd-cart-item');
+            }
+        });
+    }
+
+    function setupGiftRowObserver() {
+        var root = document.querySelector('form.woocommerce-cart-form, .wc-block-cart, .wc-block-cart-items');
+        if (!root) {
+            return;
+        }
+        if (giftRowObserver) {
+            giftRowObserver.disconnect();
+        }
+        giftRowObserver = new MutationObserver(function () {
+            if (giftRowTimer) {
+                window.clearTimeout(giftRowTimer);
+            }
+            giftRowTimer = window.setTimeout(function () {
+                markGiftRows();
+                giftRowTimer = null;
+            }, 60);
+        });
+        giftRowObserver.observe(root, {
+            childList: true,
+            subtree: true
         });
     }
 

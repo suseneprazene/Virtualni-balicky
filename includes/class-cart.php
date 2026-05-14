@@ -332,8 +332,9 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
+        $icon = DD_PLUGIN_URL . 'assets/package-icon.svg';
         return wp_kses_post(
-            '<span class="dd-cart-item-label" data-dd-gift-item="1">🎁 ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
+            '<span class="dd-cart-item-label" data-dd-gift-item="1"><img class="dd-cart-item-icon" src="' . esc_url( $icon ) . '" alt="" loading="lazy" decoding="async" /> ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
         );
     }
 
@@ -837,10 +838,18 @@ class DD_Cart {
         }
         .dd-info-close:hover{color:#333 !important;background:none !important;box-shadow:none !important;}
         .dd-cart-item .product-quantity,
+        .dd-cart-item td.product-quantity,
         .dd-cart-item .wc-block-components-quantity-selector,
-        .dd-cart-item .wc-block-cart-item__quantity{
+        .dd-cart-item .wc-block-cart-item__quantity,
+        .dd-cart-item .quantity,
+        .dd-cart-item .qty,
+        .dd-cart-item .plus,
+        .dd-cart-item .minus,
+        .dd-cart-item [class*="quantity"] button{
             display:none !important;
         }
+        .dd-cart-item-label{display:inline-flex;align-items:center;gap:.35em;}
+        .dd-cart-item-icon{width:1em;height:1em;display:inline-block;flex:0 0 1em;vertical-align:middle;}
         ';
     }
 }
