@@ -55,13 +55,25 @@
                 return;
             }
 
+            console.info('DD select success:', {
+                packageId: packageId,
+                type: type,
+                checked: checked,
+                ddCount: res.data && typeof res.data.dd_count !== 'undefined' ? res.data.dd_count : null,
+                ddItems: res.data && res.data.dd_items ? res.data.dd_items : [],
+                cartSize: res.data && typeof res.data.cart_size !== 'undefined' ? res.data.cart_size : null,
+                session: res.data && res.data.session ? res.data.session : null
+            });
+
             if (DD_Cart.is_block_cart === '1') {
                 // Aktualizuj naši sekci v DOM
                 if (res.data && res.data.html) {
                     replaceGiftSection(res.data.html);
                 }
-                // Triggeruj přepočet blokového košíku
-                triggerBlockCartRefresh();
+                // Blokový košík bere data ze Store API; spolehlivý sync je přes reload.
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 200);
             } else {
                 $(document.body).trigger('wc_update_cart');
             }
@@ -77,29 +89,6 @@
         tmp.innerHTML = html;
         var newSection = tmp.querySelector('#dd-gift-section');
         if (newSection) existing.replaceWith(newSection);
-    }
-
-    function triggerBlockCartRefresh() {
-        var refreshed = false;
-
-        // WooCommerce blocks používá vlastní store (@woocommerce/block-data)
-        if (window.wp && window.wp.data) {
-            try {
-                var cartStore = window.wp.data.dispatch('wc/store/cart');
-                if (cartStore && typeof cartStore.invalidateResolutionForStore === 'function') {
-                    cartStore.invalidateResolutionForStore();
-                    refreshed = true;
-                }
-            } catch (e) {}
-        }
-
-        // Fallback pro případy, kdy Store API invalidate není dostupné
-        if (!refreshed) {
-            console.warn('DD block cart refresh: Store API invalidation unavailable, reloading page as fallback');
-            window.setTimeout(function () {
-                window.location.reload();
-            }, 250);
-        }
     }
 
     window.DD_Cart_init = init;

@@ -678,6 +678,10 @@ class DD_Cart {
             'dd_items'  => $dd_items,
             'dd_count'  => count( $dd_items ),
             'cart_size' => count( WC()->cart->get_cart() ),
+            'session'   => [
+                'selected'  => WC()->session ? (int) WC()->session->get( self::SESSION_KEY, 0 ) : 0,
+                'crosssell' => WC()->session ? (int) WC()->session->get( self::SESSION_XSELL, 0 ) : 0,
+            ],
         ] );
     }
 
