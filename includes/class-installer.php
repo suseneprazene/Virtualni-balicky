@@ -13,6 +13,7 @@ class DD_Installer {
             description  TEXT,
             price        DECIMAL(10,2)   NOT NULL DEFAULT 0.00,
             active       TINYINT(1)      NOT NULL DEFAULT 1,
+            first_free   TINYINT(1)      NOT NULL DEFAULT 0,
             created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id)
         ) $charset;";

@@ -5,10 +5,23 @@
     var selectionInProgress = false;
 
     function init() {
+        // Přímé balíčky – vzájemné vylučování: zaškrtnutím jednoho se ostatní odškrtnou
         $(document).off('change.dd', '.dd-pkg-checkbox').on('change.dd', '.dd-pkg-checkbox', function () {
+            var $this = $(this);
+            var type  = $this.data('type') || 'direct';
+
+            if ( type === 'direct' && this.checked ) {
+                // Odškrtni všechny ostatní přímé checkboxy kromě tohoto
+                $('.dd-pkg-direct').not(this).each(function () {
+                    if ( this.checked ) {
+                        $(this).prop('checked', false);
+                    }
+                });
+            }
+
             sendSelection(
-                $(this).data('package'),
-                $(this).data('type') || 'direct',
+                $this.data('package'),
+                type,
                 this.checked ? 1 : 0
             );
         });

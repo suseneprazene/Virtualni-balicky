@@ -17,6 +17,8 @@ class DD_Admin {
         add_action( 'wp_ajax_dd_save_rules',      [ __CLASS__, 'ajax_save_rules' ] );
         add_action( 'wp_ajax_dd_get_rules',       [ __CLASS__, 'ajax_get_rules' ] );
         add_action( 'wp_ajax_dd_customer_history',  [ __CLASS__, 'ajax_customer_history' ] );
+        add_action( 'wp_ajax_dd_download_document', [ __CLASS__, 'ajax_download_document' ] );
+        add_action( 'wp_ajax_dd_clear_customer',    [ __CLASS__, 'ajax_clear_customer' ] );
     }
 
     public static function register_menu(): void {
@@ -103,10 +105,11 @@ class DD_Admin {
         check_ajax_referer( 'dd_admin_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_woocommerce' ) ) wp_send_json_error( 'Nedostatečná oprávnění.' );
 
-        $id    = absint( $_POST['id'] ?? 0 );
-        $name  = sanitize_text_field( $_POST['name'] ?? '' );
-        $desc  = sanitize_textarea_field( $_POST['description'] ?? '' );
-        $price = (float) str_replace( ',', '.', $_POST['price'] ?? '0' );
+        $id         = absint( $_POST['id'] ?? 0 );
+        $name       = sanitize_text_field( $_POST['name'] ?? '' );
+        $desc       = sanitize_textarea_field( $_POST['description'] ?? '' );
+        $price      = (float) str_replace( ',', '.', $_POST['price'] ?? '0' );
+        $first_free = absint( $_POST['first_free'] ?? 0 ) ? 1 : 0;
 
         if ( empty( $name ) ) wp_send_json_error( 'Název balíčku je povinný.' );
 
@@ -114,13 +117,13 @@ class DD_Admin {
         $table = $wpdb->prefix . 'dd_packages';
 
         if ( $id > 0 ) {
-            $wpdb->update( $table, [ 'name' => $name, 'description' => $desc, 'price' => $price ], [ 'id' => $id ], [ '%s', '%s', '%f' ], [ '%d' ] );
+            $wpdb->update( $table, [ 'name' => $name, 'description' => $desc, 'price' => $price, 'first_free' => $first_free ], [ 'id' => $id ], [ '%s', '%s', '%f', '%d' ], [ '%d' ] );
         } else {
-            $wpdb->insert( $table, [ 'name' => $name, 'description' => $desc, 'price' => $price, 'active' => 1 ], [ '%s', '%s', '%f', '%d' ] );
+            $wpdb->insert( $table, [ 'name' => $name, 'description' => $desc, 'price' => $price, 'active' => 1, 'first_free' => $first_free ], [ '%s', '%s', '%f', '%d', '%d' ] );
             $id = $wpdb->insert_id;
         }
 
-        wp_send_json_success( [ 'id' => $id, 'name' => $name, 'description' => $desc, 'price' => $price ] );
+        wp_send_json_success( [ 'id' => $id, 'name' => $name, 'description' => $desc, 'price' => $price, 'first_free' => $first_free ] );
     }
 
     public static function ajax_delete_package(): void {
@@ -346,5 +349,58 @@ class DD_Admin {
             'history' => $rows,
             'summary' => $summary,
         ] );
+    }
+
+    // ── AJAX: smazání historie zákazníka (pro testování) ──────────────────────
+
+    public static function ajax_clear_customer(): void {
+        check_ajax_referer( 'dd_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) wp_send_json_error( 'Nedostatečná oprávnění.' );
+
+        $email      = sanitize_email( $_POST['email'] ?? '' );
+        $package_id = absint( $_POST['package_id'] ?? 0 );
+
+        if ( ! $email ) wp_send_json_error( 'Chybí e-mail.' );
+
+        global $wpdb;
+        if ( $package_id > 0 ) {
+            $deleted = $wpdb->delete(
+                $wpdb->prefix . 'dd_sent',
+                [ 'user_email' => $email, 'package_id' => $package_id ],
+                [ '%s', '%d' ]
+            );
+        } else {
+            $deleted = $wpdb->delete(
+                $wpdb->prefix . 'dd_sent',
+                [ 'user_email' => $email ],
+                [ '%s' ]
+            );
+        }
+
+        wp_send_json_success( [ 'deleted' => (int) $deleted ] );
+    }
+
+    // ── AJAX: stažení dokumentu (admin – proklik z objednávky) ────────────────
+
+    public static function ajax_download_document(): void {
+        check_ajax_referer( 'dd_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) wp_die( 'Nedostatečná oprávnění.', 403 );
+
+        $doc_id = absint( $_GET['doc_id'] ?? 0 );
+        if ( ! $doc_id ) wp_die( 'Chybí ID dokumentu.' );
+
+        global $wpdb;
+        $doc = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}dd_documents WHERE id = %d", $doc_id ) );
+        if ( ! $doc || ! file_exists( $doc->file_path ) ) wp_die( 'Dokument nenalezen.' );
+
+        $filename = basename( $doc->file_path );
+        $mime     = $doc->file_type ?: mime_content_type( $doc->file_path ) ?: 'application/octet-stream';
+
+        header( 'Content-Type: ' . $mime );
+        header( 'Content-Disposition: attachment; filename="' . esc_attr( $doc->name ) . '_' . $filename . '"' );
+        header( 'Content-Length: ' . filesize( $doc->file_path ) );
+        header( 'Cache-Control: no-cache' );
+        readfile( $doc->file_path );
+        exit;
     }
 }

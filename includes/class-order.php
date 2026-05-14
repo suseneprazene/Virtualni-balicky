@@ -241,19 +241,35 @@ class DD_Order {
             [ 'label' => __( 'Cross-sell dárek', 'dobrovolny-darek' ), 'pkg_key' => '_dd_xsell_package_id', 'status_key' => '_dd_xsell_gift_status', 'doc_key' => '_dd_xsell_document_name' ],
         ];
 
+        $doc_id_key_map = [
+            '_dd_gift_status'       => '_dd_document_id',
+            '_dd_xsell_gift_status' => '_dd_xsell_document_id',
+        ];
+
         foreach ( $gifts as $gift ) {
             $pkg_id = (int) $order->get_meta( $gift['pkg_key'] );
             if ( ! $pkg_id ) continue;
             $pkg    = DD_Package::get( $pkg_id );
             $status = $order->get_meta( $gift['status_key'] );
             $doc    = $order->get_meta( $gift['doc_key'] );
+            $doc_id = (int) $order->get_meta( $doc_id_key_map[ $gift['status_key'] ] ?? '' );
 
             echo '<div style="margin-top:.8em;padding:.7em;background:#f9f0ff;border-left:4px solid #8a2be2;">';
             echo '<strong>🎁 ' . esc_html( $gift['label'] );
             if ( $pkg ) echo ' – ' . esc_html( $pkg->name );
             echo ':</strong> ';
             echo esc_html( $labels[ $status ] ?? $status );
-            if ( $doc ) echo ' — <em>' . esc_html( $doc ) . '</em>';
+            if ( $doc ) {
+                echo ' — <em>' . esc_html( $doc ) . '</em>';
+                if ( $doc_id ) {
+                    $download_url = wp_nonce_url(
+                        admin_url( 'admin-ajax.php?action=dd_download_document&doc_id=' . $doc_id ),
+                        'dd_admin_nonce',
+                        'nonce'
+                    );
+                    echo ' <a href="' . esc_url( $download_url ) . '" title="' . esc_attr__( 'Stáhnout dokument', 'dobrovolny-darek' ) . '">📥 ' . esc_html__( 'Stáhnout', 'dobrovolny-darek' ) . '</a>';
+                }
+            }
 
             if ( in_array( $status, [ 'error_email', 'pending', 'error_no_package' ], true ) ) {
                 $resend_url = wp_nonce_url(

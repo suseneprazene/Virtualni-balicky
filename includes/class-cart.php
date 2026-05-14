@@ -48,6 +48,30 @@ class DD_Cart {
         ] );
 
         wp_add_inline_style( 'woocommerce-general', self::cart_css() );
+
+        // Toggle info popupu
+        wp_add_inline_script( 'dd-cart', "
+(function(){
+    document.addEventListener('click', function(e){
+        var btn = e.target.closest('.dd-info-btn');
+        var close = e.target.closest('.dd-info-close');
+        if (btn) {
+            var popup = btn.closest('.dd-gift-heading').nextElementSibling;
+            if (popup && popup.classList.contains('dd-info-popup')) {
+                popup.hidden = !popup.hidden;
+            }
+            return;
+        }
+        if (close) {
+            close.closest('.dd-info-popup').hidden = true;
+            return;
+        }
+        // Klik mimo popup ho zavře
+        var open = document.querySelector('.dd-info-popup:not([hidden])');
+        if (open && !open.contains(e.target)) open.hidden = true;
+    });
+})();
+        " );
     }
 
     public static function is_block_cart(): bool {
@@ -96,7 +120,6 @@ class DD_Cart {
             return DD_Package::has_unsent( (int) $pkg->id, $email );
         } ) );
 
-        // Balíčky kde zákazník vyčerpal vše (jen pro přihlášené nebo known email)
         $exhausted_pkgs = [];
         if ( $email ) {
             $exhausted_pkgs = array_values( array_filter( $resolved['matched'], function( $pkg ) use ( $email ) {
@@ -112,21 +135,37 @@ class DD_Cart {
 
         ob_start();
         echo '<div class="dd-gift-section" id="dd-gift-section">';
-        echo '<h3 class="dd-gift-heading">🎁 ' . esc_html__( 'Tajný dárek', 'dobrovolny-darek' ) . '</h3>';
+        echo '<h3 class="dd-gift-heading">🎁 ' . esc_html__( 'Náhodný balíček', 'dobrovolny-darek' )
+            . ' <button type="button" class="dd-info-btn" aria-label="' . esc_attr__( 'Co je náhodný balíček?', 'dobrovolny-darek' ) . '">?</button></h3>';
 
+        // Info popup
+        echo '<div class="dd-info-popup" role="tooltip" hidden>';
+        echo '<button type="button" class="dd-info-close" aria-label="Zavřít">×</button>';
+        echo '<strong>' . esc_html__( 'Co je náhodný balíček?', 'dobrovolny-darek' ) . '</strong>';
+        echo '<p>' . esc_html__(
+            'Náhodný balíček je digitální balíček překvapení, který si můžeš přidat ke své objednávce. '
+            . 'Systém ti nabídne balíčky vztahující se ke kategoriím produktů, které sis právě koupil – takže překvapení bude sedět.',
+            'dobrovolny-darek'
+        ) . '</p>';
+        echo '<ul>';
+        echo '<li>' . esc_html__( '🎲 Obsah je tajný – zjistíš ho až z e-mailu po dokončení objednávky.', 'dobrovolny-darek' ) . '</li>';
+        echo '<li>' . esc_html__( '🔁 Každý balíček si koupíš maximálně jednou – nikdy nedostaneš stejný obsah dvakrát.', 'dobrovolny-darek' ) . '</li>';
+        echo '<li>' . esc_html__( '🛒 Můžeš si přidat i balíček z jiné kategorie jako bonus navíc.', 'dobrovolny-darek' ) . '</li>';
+        echo '<li>' . esc_html__( '📩 Dárek obdržíš jako přílohu e-mailu ihned po zpracování a zaplacení objednávky.', 'dobrovolny-darek' ) . '</li>';
+        echo '</ul>';
+        echo '</div>';
+
+        // Přímé balíčky – každý jako samostatný checkbox, vzájemně se vylučující
         if ( ! empty( $available ) ) {
-            if ( count( $available ) === 1 ) {
-                self::render_single_checkbox( $available[0], $selected_id === (int) $available[0]->id );
-            } else {
-                self::render_radio_group( $available, $selected_id );
-            }
+            self::render_direct_packages( $available, $selected_id, $email, $product_ids, $category_ids );
         }
 
+        // Cross-sell
         foreach ( $crosssell_pkgs as $pkg ) {
             self::render_crosssell_checkbox( $pkg, $xsell_id === (int) $pkg->id );
         }
 
-        // Zpráva pro vyčerpané balíčky (bez zbývajících dokumentů)
+        // Vyčerpané
         if ( ! empty( $exhausted_pkgs ) && empty( $available ) ) {
             $exhausted_msg = get_option(
                 'dd_exhausted_message',
@@ -223,62 +262,110 @@ class DD_Cart {
 
     // ── Renderovací helpery ───────────────────────────────────────────────────
 
-    private static function price_text( object $pkg ): string {
-        return (float) $pkg->price > 0
-            ? ' (+' . wp_strip_all_tags( wc_price( $pkg->price ) ) . ')'
-            : ' (' . __( 'zdarma', 'dobrovolny-darek' ) . ')';
-    }
+    /**
+     * Každý přímý balíček = vlastní checkbox pojmenovaný podle kategorie z košíku.
+     * Vzájemně se vylučují – výběrem jednoho se ostatní odškrtnou (řeší JS).
+     * Pokud je jen jeden, zobrazí se jako prostý checkbox.
+     */
+    private static function render_direct_packages(
+        array $packages,
+        int $selected_id,
+        string $email,
+        array $product_ids,
+        array $category_ids
+    ): void {
+        $description = get_option( 'dd_cart_description', 'Překvapení čeká – obsah balíčku zjistíš až v e-mailu po objednávce.' );
+        $multiple    = count( $packages ) > 1;
 
-    private static function render_single_checkbox( object $pkg, bool $checked ): void {
-        $label       = get_option( 'dd_checkbox_label', '🎁 Přidat tajný dárek' );
-        $description = get_option( 'dd_cart_description', 'Překvapení čeká – obsah dárku zjistíte až v e-mailu po objednávce.' );
-        ?>
-        <div class="dd-gift-row dd-gift-direct">
-            <label class="dd-gift-label">
-                <input type="checkbox"
-                       class="dd-pkg-checkbox"
-                       data-package="<?php echo esc_attr( $pkg->id ); ?>"
-                       data-type="direct"
-                       <?php checked( $checked ); ?>>
-                <span><?php echo esc_html( $label . self::price_text( $pkg ) ); ?></span>
-            </label>
-            <?php if ( $description ) : ?>
-                <p class="dd-gift-desc"><?php echo esc_html( $description ); ?></p>
-            <?php endif; ?>
-        </div>
-        <?php
-    }
-
-    private static function render_radio_group( array $packages, int $selected_id ): void {
-        $description = get_option( 'dd_cart_description', 'Překvapení čeká – obsah dárku zjistíte až v e-mailu po objednávce.' );
-        echo '<div class="dd-gift-row dd-gift-multi">';
-        echo '<p class="dd-gift-intro">' . esc_html__( 'Vyberte tajný dárek:', 'dobrovolny-darek' ) . '</p>';
-        echo '<label class="dd-radio-label"><input type="radio" name="dd_package_radio" class="dd-pkg-radio" value="0" data-type="direct" '
-            . checked( $selected_id, 0, false ) . '> ' . esc_html__( 'Nechci dárek', 'dobrovolny-darek' ) . '</label>';
+        if ( $multiple ) {
+            echo '<p class="dd-gift-intro">' . esc_html__( 'Vyber si náhodný balíček z kategorie:', 'dobrovolny-darek' ) . '</p>';
+        }
 
         foreach ( $packages as $pkg ) {
-            echo '<label class="dd-radio-label"><input type="radio" name="dd_package_radio" class="dd-pkg-radio" value="'
-                . esc_attr( $pkg->id ) . '" data-type="direct" ' . checked( $selected_id, $pkg->id, false ) . '> '
-                . esc_html( $pkg->name . self::price_text( $pkg ) ) . '</label>';
+            $ff         = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
+            $cat_label  = self::category_label_for_package( $pkg, $product_ids );
+            $line_label = $multiple
+                ? sprintf( __( 'Náhodný balíček z kategorie %s', 'dobrovolny-darek' ), $cat_label )
+                : get_option( 'dd_checkbox_label', __( '🎁 Přidat náhodný balíček', 'dobrovolny-darek' ) )
+                  . ( $cat_label ? ' – ' . $cat_label : '' );
+
+            echo '<div class="dd-gift-row dd-gift-direct">';
+            echo '<label class="dd-gift-label">';
+            echo '<input type="checkbox"'
+                . ' class="dd-pkg-checkbox dd-pkg-direct"'
+                . ' data-package="' . esc_attr( $pkg->id ) . '"'
+                . ' data-type="direct"'
+                . ( $selected_id === (int) $pkg->id ? ' checked' : '' ) . '>';
+            echo '<span>' . esc_html( $line_label ) . self::price_text_html( $pkg, $ff ) . '</span>'; // phpcs:ignore
+            echo '</label>';
+            echo '</div>';
         }
 
-        // Cena pro náhodný výběr = průměr nebo min cena balíčků
-        $prices = array_map( fn($p) => (float) $p->price, $packages );
-        $has_paid = array_filter( $prices, fn($p) => $p > 0 );
-        if ( count( $has_paid ) > 0 ) {
-            $random_price_text = ' (+' . wp_strip_all_tags( wc_price( min( $has_paid ) ) ) . '–' . wp_strip_all_tags( wc_price( max( $has_paid ) ) ) . ')';
-        } else {
-            $random_price_text = ' (' . __( 'zdarma', 'dobrovolny-darek' ) . ')';
+        if ( $description ) {
+            echo '<p class="dd-gift-desc">' . esc_html( $description ) . '</p>';
         }
-        echo '<label class="dd-radio-label"><input type="radio" name="dd_package_radio" class="dd-pkg-radio" value="-1" data-type="direct" '
-            . checked( $selected_id, -1, false ) . '> ' . esc_html( '🎲 ' . __( 'Náhodný výběr', 'dobrovolny-darek' ) . $random_price_text ) . '</label>';
+    }
 
-        if ( $description ) echo '<p class="dd-gift-desc">' . esc_html( $description ) . '</p>';
-        echo '</div>';
+    /**
+     * Vrátí název kategorie relevantní pro daný balíček a košík.
+     * Hledá průnik kategorií pravidel balíčku a kategorií produktů v košíku.
+     * Fallback: název balíčku.
+     */
+    private static function category_label_for_package( object $pkg, array $product_ids ): string {
+        $rules = DD_Package::get_rules( (int) $pkg->id );
+        if ( empty( $rules ) ) {
+            // Univerzální balíček – vrátíme název
+            return $pkg->name;
+        }
+
+        $rule_cat_ids = array_map(
+            'intval',
+            array_column(
+                array_filter( (array) $rules, fn( $r ) => $r->rule_type === 'category' ),
+                'object_id'
+            )
+        );
+
+        // Najdi kategorie produktů v košíku a vyber průnik s pravidly balíčku
+        foreach ( $product_ids as $prod_id ) {
+            $terms = get_the_terms( $prod_id, 'product_cat' );
+            if ( ! $terms || is_wp_error( $terms ) ) continue;
+            foreach ( $terms as $term ) {
+                if ( in_array( $term->term_id, $rule_cat_ids, true ) ) {
+                    return $term->name;
+                }
+            }
+        }
+
+        // Fallback: název první kategorie v pravidle
+        if ( ! empty( $rule_cat_ids ) ) {
+            $term = get_term( $rule_cat_ids[0], 'product_cat' );
+            if ( $term && ! is_wp_error( $term ) ) return $term->name;
+        }
+
+        return $pkg->name;
+    }
+
+    /**
+     * Vrátí HTML s cenou – při first_free zobrazí přeškrtnutou původní cenu.
+     * Smí obsahovat HTML tagy (<s>), neescapovat při výpisu.
+     */
+    private static function price_text_html( object $pkg, bool $first_free = false ): string {
+        if ( (float) $pkg->price <= 0 ) {
+            return ' <span class="dd-price-free">(' . esc_html__( 'zdarma', 'dobrovolny-darek' ) . ')</span>';
+        }
+        if ( $first_free ) {
+            $original = wp_strip_all_tags( wc_price( $pkg->price ) );
+            return ' <span class="dd-price-firstfree">(<s>' . $original . '</s>&nbsp;'
+                . esc_html__( 'první zdarma', 'dobrovolny-darek' ) . ')</span>';
+        }
+        return ' <span class="dd-price">(+' . wp_strip_all_tags( wc_price( $pkg->price ) ) . ')</span>';
     }
 
     private static function render_crosssell_checkbox( object $pkg, bool $checked ): void {
-        $template = get_option( 'dd_crosssell_label', 'Zajímá tě také tajný dárek ze sekce {package_name}?' );
+        $email    = self::get_customer_email();
+        $ff       = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
+        $template = get_option( 'dd_crosssell_label', 'Zajímá tě také náhodný balíček ze sekce {package_name}?' );
         $label    = str_replace( '{package_name}', $pkg->name, $template );
         ?>
         <div class="dd-gift-row dd-gift-crosssell">
@@ -288,7 +375,7 @@ class DD_Cart {
                        data-package="<?php echo esc_attr( $pkg->id ); ?>"
                        data-type="crosssell"
                        <?php checked( $checked ); ?>>
-                <span><?php echo esc_html( $label . self::price_text( $pkg ) ); ?></span>
+                <span><?php echo esc_html( $label ); ?><?php echo self::price_text_html( $pkg, $ff ); // phpcs:ignore ?></span>
             </label>
         </div>
         <?php
@@ -332,11 +419,17 @@ class DD_Cart {
         if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
         if ( ! WC()->session ) return;
 
-        $add_fee = function ( int $pkg_id, string $suffix = '' ) use ( $cart ) {
+        $email = self::get_customer_email();
+
+        $add_fee = function ( int $pkg_id, string $suffix = '' ) use ( $cart, $email ) {
             if ( $pkg_id <= 0 ) return;
             $pkg = DD_Package::get( $pkg_id );
             if ( ! $pkg || ! $pkg->active || (float) $pkg->price <= 0 ) return;
-            $label = get_option( 'dd_checkbox_label', __( 'Tajný dárek', 'dobrovolny-darek' ) );
+
+            // První dárek zdarma – přeskoč fee
+            if ( DD_Package::is_first_free_eligible( $pkg_id, $email ) ) return;
+
+            $label = get_option( 'dd_checkbox_label', __( 'náhodný balíček', 'dobrovolny-darek' ) );
             $cart->add_fee( $label . $suffix, (float) $pkg->price, true );
         };
 
@@ -363,19 +456,51 @@ class DD_Cart {
     private static function cart_css(): string {
         return '
         .dd-gift-section{margin:1.2em 0;padding:1em 1.2em;border:2px dashed #f0a500;border-radius:8px;background:#fffdf0;}
-        .dd-gift-heading{margin:0 0 .7em;font-size:1em;color:#7a5500;}
+        .dd-gift-heading{margin:0 0 .7em;color:#7a5500;}
         .dd-gift-row{margin-bottom:.6em;}
         .dd-gift-row:last-child{margin-bottom:0;}
         .dd-gift-label{display:flex;align-items:flex-start;gap:.5em;cursor:pointer;font-weight:600;}
-        .dd-gift-label input{margin-top:.15em;width:1.1em;height:1.1em;flex-shrink:0;}
-        .dd-gift-desc{margin:.3em 0 0 1.6em;font-size:.88em;color:#666;}
-        .dd-gift-intro{margin:0 0 .4em;font-weight:600;font-size:.95em;}
-        .dd-radio-label{display:flex;align-items:center;gap:.5em;margin:.3em 0;cursor:pointer;}
-        .dd-radio-label input{width:1.1em;height:1.1em;}
+        .dd-gift-label input{margin-top:.2em;width:1.1em;height:1.1em;flex-shrink:0;}
+        .dd-gift-desc{margin:.4em 0 0 0;color:#555;}
+        .dd-gift-intro{margin:0 0 .5em;font-weight:600;}
         .dd-gift-crosssell{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.6em;}
-        .dd-gift-crosssell .dd-gift-label{color:#555;font-weight:normal;font-size:.92em;}
+        .dd-gift-crosssell .dd-gift-label{color:#555;font-weight:normal;}
         .dd-gift-exhausted{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.4em;}
-        .dd-gift-exhausted-msg{margin:0;font-size:.92em;color:#777;font-style:italic;}
+        .dd-gift-exhausted-msg{margin:0;color:#777;font-style:italic;}
+        .dd-price-firstfree{color:#2ecc71;font-weight:700;}
+        .dd-price-firstfree s{color:#999;font-weight:normal;text-decoration:line-through;}
+
+        /* Info tlačítko */
+        .dd-info-btn{
+            display:inline-flex;align-items:center;justify-content:center;
+            width:18px;height:18px;border-radius:50%;
+            background:#f0a500;color:#fff;font-size:.72em;font-weight:700;
+            border:none;cursor:pointer;line-height:1;padding:0;
+            vertical-align:middle;margin-left:.35em;flex-shrink:0;
+        }
+        .dd-info-btn:hover{background:#c07800;}
+
+        /* Info popup – křížek vpravo nahoře, ale mimo tok textu díky paddingu */
+        .dd-info-popup{
+            position:relative;
+            background:#fff;border:1px solid #ddd;border-radius:8px;
+            padding:.9em 2.4em .9em 1.1em;
+            margin:.5em 0 .4em;
+            line-height:1.6;
+            box-shadow:0 2px 8px rgba(0,0,0,.1);
+        }
+        .dd-info-popup[hidden]{display:none;}
+        .dd-info-popup strong{display:block;margin-bottom:.35em;}
+        .dd-info-popup p{margin:.3em 0 .5em;}
+        .dd-info-popup ul{margin:.2em 0 0;padding-left:1.3em;}
+        .dd-info-popup li{margin-bottom:.3em;}
+        .dd-info-close{
+            position:absolute;top:.55em;right:.65em;
+            background:none;border:none;cursor:pointer;
+            font-size:.85em;color:#aaa;line-height:1;padding:2px 4px;
+            border-radius:3px;
+        }
+        .dd-info-close:hover{color:#333;background:#f0f0f0;}
         ';
     }
 }

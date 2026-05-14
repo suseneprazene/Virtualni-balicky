@@ -88,6 +88,22 @@
                 html += '</tbody></table>';
             }
 
+            // Sekce pro smazání historie (testování)
+            html += '<div class="dd-clear-history-wrap">';
+            html += '<h3>🧪 Smazat historii (testování)</h3>';
+            html += '<p class="description">Smazáním záznamu se zákazníkovi obnoví nárok na dárek z daného balíčku – včetně <em>první dárek zdarma</em>. Použij jen pro testování.</p>';
+            html += '<div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em">';
+            html += '<select id="dd-clear-package-select" style="min-width:200px"><option value="0">— Všechny balíčky —</option>';
+            d.summary.forEach(function(s) {
+                if (s.sent > 0) {
+                    html += '<option value="' + escHtml(String(s.package_id)) + '">' + escHtml(s.package_name) + ' (' + s.sent + ' odeslání)</option>';
+                }
+            });
+            html += '</select>';
+            html += '<button class="button button-link-delete" id="dd-clear-history-btn">🗑 Smazat historii</button>';
+            html += '</div>';
+            html += '</div>';
+
             out.html(html);
         });
     }
@@ -105,6 +121,34 @@
     function escHtml(str) {
         return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    // Smazání historie – delegovaný handler (elementy jsou dynamicky vytvořeny)
+    $(document).on('click', '#dd-clear-history-btn', function() {
+        var email  = $('#dd-customer-email').val().trim();
+        var pkgId  = $('#dd-clear-package-select').val() || 0;
+        var pkgLabel = $('#dd-clear-package-select option:selected').text();
+        var msg = pkgId > 0
+            ? 'Opravdu smazat historii dárků zákazníka ' + email + ' pro balíček "' + pkgLabel + '"?'
+            : 'Opravdu smazat CELOU historii dárků zákazníka ' + email + '?';
+        if (!confirm(msg)) return;
+
+        $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+            action:     'dd_clear_customer',
+            nonce:      nonce,
+            email:      email,
+            package_id: pkgId,
+        }, function(res) {
+            if (!res.success) {
+                alert('Chyba: ' + (res.data || 'neznámá'));
+                return;
+            }
+            var deleted = res.data.deleted;
+            var notice = $('<div class="notice notice-success is-dismissible"><p>✅ Smazáno ' + deleted + ' záznamů. Historie zákazníka byla vymazána.</p></div>');
+            $('#dd-customer-result').prepend(notice);
+            // Znovu načti přehled
+            search(email);
+        });
+    });
 })(jQuery);
 </script>
 
@@ -116,4 +160,14 @@
     padding: 1.2em;
     max-width: 600px;
 }
+.dd-clear-history-wrap {
+    margin-top: 2em;
+    padding: 1em 1.2em;
+    background: #fff8f0;
+    border: 1px solid #f0c070;
+    border-left: 4px solid #e67e00;
+    border-radius: 6px;
+    max-width: 700px;
+}
+.dd-clear-history-wrap h3 { margin-top: 0; font-size: 1em; }
 </style>

@@ -6,12 +6,12 @@
         $.post(DD.ajax_url, { action, nonce: DD.nonce, ...data }, cb).fail(() => alert(DD.strings.error));
 
     // ── Nový balíček ──────────────────────────────────────────────────────────
-    $('#dd-new-package-btn').on('click', () => openDetail(0, '', '', 15));
+    $('#dd-new-package-btn').on('click', () => openDetail(0, '', '', 15, 0));
 
     // ── Upravit balíček ───────────────────────────────────────────────────────
     $(document).on('click', '.dd-edit-pkg', function () {
         const btn = $(this);
-        openDetail(btn.data('id'), btn.data('name'), btn.data('desc'), btn.data('price'));
+        openDetail(btn.data('id'), btn.data('name'), btn.data('desc'), btn.data('price'), btn.data('first-free') || 0);
         // Nejprve vyrenderuj strom, pak načti zaškrtnuté hodnoty
         renderCategoryTree(function () {
             loadRules(btn.data('id'));
@@ -25,14 +25,15 @@
     // ── Uložit balíček ────────────────────────────────────────────────────────
     $('#dd-save-package-btn').on('click', function () {
         const btn   = $(this);
-        const id    = $('#dd-pkg-id').val();
-        const name  = $('#dd-pkg-name').val().trim();
-        const desc  = $('#dd-pkg-desc').val().trim();
-        const price = $('#dd-pkg-price').val();
+        const id         = $('#dd-pkg-id').val();
+        const name       = $('#dd-pkg-name').val().trim();
+        const desc       = $('#dd-pkg-desc').val().trim();
+        const price      = $('#dd-pkg-price').val();
+        const first_free = $('#dd-pkg-first-free').is(':checked') ? 1 : 0;
         if (!name) { alert('Název je povinný.'); return; }
 
         btn.text(DD.strings.saving).prop('disabled', true);
-        ajax('dd_save_package', { id, name, description: desc, price }, res => {
+        ajax('dd_save_package', { id, name, description: desc, price, first_free }, res => {
             btn.text('Uložit balíček').prop('disabled', false);
             if (!res.success) { alert(res.data || DD.strings.error); return; }
             const pkg = res.data;
@@ -48,7 +49,8 @@
                 existing.find('.dd-edit-pkg')
                     .data('name', pkg.name)
                     .data('desc', pkg.description || '')
-                    .data('price', pkg.price);
+                    .data('price', pkg.price)
+                    .data('first-free', pkg.first_free);
             } else {
                 const row = `<div class="dd-pkg-row dd-active" data-id="${pkg.id}">
                     <div class="dd-pkg-info">
@@ -57,7 +59,7 @@
                     </div>
                     <div class="dd-pkg-actions">
                         <label class="dd-toggle"><input type="checkbox" class="dd-toggle-active" checked data-id="${pkg.id}"><span class="dd-toggle-slider"></span></label>
-                        <button class="button dd-edit-pkg" data-id="${pkg.id}" data-name="${escHtml(pkg.name)}" data-desc="${escHtml(pkg.description||'')}" data-price="${pkg.price}">Upravit</button>
+                        <button class="button dd-edit-pkg" data-id="${pkg.id}" data-name="${escHtml(pkg.name)}" data-desc="${escHtml(pkg.description||'')}" data-price="${pkg.price}" data-first-free="${pkg.first_free}">Upravit</button>
                         <button class="button button-link-delete dd-delete-pkg" data-id="${pkg.id}">🗑</button>
                     </div>
                 </div>`;
@@ -300,11 +302,12 @@
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    function openDetail(id, name, desc, price) {
+    function openDetail(id, name, desc, price, firstFree) {
         $('#dd-pkg-id').val(id);
         $('#dd-pkg-name').val(name);
         $('#dd-pkg-desc').val(desc);
         $('#dd-pkg-price').val(price);
+        $('#dd-pkg-first-free').prop('checked', !!parseInt(firstFree));
         $('#dd-detail-title').text(id ? name : 'Nový balíček');
         const isExisting = id > 0;
         $('#dd-documents-section, #dd-rules-section').toggle(isExisting);

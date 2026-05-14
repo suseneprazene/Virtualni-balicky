@@ -143,6 +143,25 @@ class DD_Package {
         ) );
     }
 
+    // ── První dárek zdarma ────────────────────────────────────────────────────
+
+    /**
+     * Vrátí true, pokud má zákazník nárok na první dárek zdarma z daného balíčku.
+     * Podmínka: balíček má first_free=1 A zákazník ještě nikdy žádný dárek
+     * z tohoto balíčku neobdržel.
+     */
+    public static function is_first_free_eligible( int $package_id, string $email ): bool {
+        global $wpdb;
+        $pkg = self::get( $package_id );
+        if ( ! $pkg || ! (int) $pkg->first_free ) return false;
+        if ( ! $email ) return true; // neznámý zákazník → optimisticky zdarma
+        $sent = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}dd_sent WHERE package_id = %d AND user_email = %s",
+            $package_id, $email
+        ) );
+        return $sent === 0;
+    }
+
     // ── Helpers pro košík ─────────────────────────────────────────────────────
 
     /**

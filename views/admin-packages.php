@@ -47,6 +47,16 @@
                             <span class="description"><?php _e( '0 = zdarma', 'dobrovolny-darek' ); ?></span>
                         </td>
                     </tr>
+                    <tr>
+                        <th><label for="dd-pkg-first-free"><?php _e( 'První dárek zdarma', 'dobrovolny-darek' ); ?></label></th>
+                        <td>
+                            <label style="display:inline-flex;align-items:center;gap:.4em;cursor:pointer;">
+                                <input type="checkbox" id="dd-pkg-first-free" value="1">
+                                <span><?php _e( 'Zákazník dostane první dárek zdarma', 'dobrovolny-darek' ); ?></span>
+                            </label>
+                            <p class="description"><?php _e( 'Pokud zákazník ještě nikdy neobdržel dárek z tohoto balíčku, poplatek se neúčtuje. V košíku se zobrazí přeškrtnutá cena s textem „první zdarma".', 'dobrovolny-darek' ); ?></p>
+                        </td>
+                    </tr>
                 </table>
                 <button class="button button-primary" id="dd-save-package-btn"><?php _e( 'Uložit balíček', 'dobrovolny-darek' ); ?></button>
             </div>

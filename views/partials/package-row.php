@@ -19,7 +19,8 @@ $price_text = $pkg->price > 0 ? wc_price( $pkg->price ) : __( 'zdarma', 'dobrovo
         <button class="button dd-edit-pkg" data-id="<?php echo esc_attr( $pkg->id ); ?>"
                 data-name="<?php echo esc_attr( $pkg->name ); ?>"
                 data-desc="<?php echo esc_attr( $pkg->description ); ?>"
-                data-price="<?php echo esc_attr( $pkg->price ); ?>">
+                data-price="<?php echo esc_attr( $pkg->price ); ?>"
+                data-first-free="<?php echo esc_attr( $pkg->first_free ?? 0 ); ?>">
             <?php _e( 'Upravit', 'dobrovolny-darek' ); ?>
         </button>
         <button class="button button-link-delete dd-delete-pkg" data-id="<?php echo esc_attr( $pkg->id ); ?>">🗑</button>
