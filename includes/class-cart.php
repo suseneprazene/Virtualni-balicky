@@ -145,6 +145,46 @@ class DD_Cart {
         return $items;
     }
 
+    /**
+     * Vrátí z košíku aktuálně zvolené DD balíčky podle typu.
+     *
+     * @return array{selected:int,crosssell:int}
+     */
+    private static function selected_ids_from_cart(): array {
+        $selected_id = 0;
+        $xsell_id    = 0;
+
+        foreach ( self::get_dd_cart_items() as $item ) {
+            if ( ( $item['dd_type'] ?? 'direct' ) === 'direct' ) {
+                $selected_id = (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 );
+            }
+            if ( ( $item['dd_type'] ?? 'direct' ) === 'crosssell' ) {
+                $xsell_id = (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 );
+            }
+        }
+
+        return [
+            'selected'  => $selected_id,
+            'crosssell' => $xsell_id,
+        ];
+    }
+
+    /**
+     * Synchronizuje session výběr DD balíčků podle aktuálního obsahu košíku.
+     *
+     * @return array{selected:int,crosssell:int}
+     */
+    private static function sync_selection_session_from_cart(): array {
+        $ids = self::selected_ids_from_cart();
+
+        if ( WC()->session ) {
+            WC()->session->set( self::SESSION_KEY, $ids['selected'] );
+            WC()->session->set( self::SESSION_XSELL, $ids['crosssell'] );
+        }
+
+        return $ids;
+    }
+
     public static function add_package_to_cart( int $pkg_id, string $type = 'direct' ): ?string {
         if ( ! WC()->cart || $pkg_id <= 0 ) return null;
 
@@ -339,16 +379,32 @@ class DD_Cart {
 
         if ( empty( $available ) && empty( $crosssell_pkgs ) && empty( $exhausted_pkgs ) ) return '';
 
-        $dd_items    = self::get_dd_cart_items();
-        $selected_id = 0;
-        $xsell_id    = 0;
-        foreach ( $dd_items as $item ) {
-            if ( ( $item['dd_type'] ?? 'direct' ) === 'direct' ) {
-                $selected_id = (int) $item[ self::CART_ITEM_KEY ];
-            }
-            if ( ( $item['dd_type'] ?? 'direct' ) === 'crosssell' ) {
-                $xsell_id = (int) $item[ self::CART_ITEM_KEY ];
-            }
+        $selected = self::selected_ids_from_cart();
+        $selected_id = $selected['selected'];
+        $xsell_id    = $selected['crosssell'];
+
+        $available_ids = array_map( 'intval', wp_list_pluck( $available, 'id' ) );
+        $crosssell_ids = array_map( 'intval', wp_list_pluck( $crosssell_pkgs, 'id' ) );
+        $session_selected  = WC()->session ? (int) WC()->session->get( self::SESSION_KEY, 0 ) : 0;
+        $session_crosssell = WC()->session ? (int) WC()->session->get( self::SESSION_XSELL, 0 ) : 0;
+
+        if ( ! $selected_id && $session_selected > 0 && in_array( $session_selected, $available_ids, true ) ) {
+            $selected_id = $session_selected;
+        }
+        if ( ! $xsell_id && $session_crosssell > 0 && in_array( $session_crosssell, $crosssell_ids, true ) ) {
+            $xsell_id = $session_crosssell;
+        }
+
+        if ( $selected_id > 0 && ! in_array( $selected_id, $available_ids, true ) ) {
+            $selected_id = 0;
+        }
+        if ( $xsell_id > 0 && ! in_array( $xsell_id, $crosssell_ids, true ) ) {
+            $xsell_id = 0;
+        }
+
+        if ( WC()->session ) {
+            WC()->session->set( self::SESSION_KEY, $selected_id );
+            WC()->session->set( self::SESSION_XSELL, $xsell_id );
         }
 
         ob_start();
@@ -657,6 +713,8 @@ class DD_Cart {
             self::remove_package_from_cart( $package_id, $type );
         }
 
+        $session_selected = self::sync_selection_session_from_cart();
+
         WC()->cart->calculate_totals();
         WC()->cart->set_session();
         if ( method_exists( WC()->cart, 'maybe_set_cart_cookies' ) ) {
@@ -679,8 +737,8 @@ class DD_Cart {
             'dd_count'  => count( $dd_items ),
             'cart_size' => count( WC()->cart->get_cart() ),
             'session'   => [
-                'selected'  => WC()->session ? (int) WC()->session->get( self::SESSION_KEY, 0 ) : 0,
-                'crosssell' => WC()->session ? (int) WC()->session->get( self::SESSION_XSELL, 0 ) : 0,
+                'selected'  => $session_selected['selected'],
+                'crosssell' => $session_selected['crosssell'],
             ],
         ] );
     }
