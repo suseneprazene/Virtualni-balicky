@@ -63,7 +63,7 @@ class DD_Cart {
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'dd_cart_nonce' ),
             'is_block_cart' => self::is_block_cart() ? '1' : '0',
-            'fixed_qty_label' => __( '1 ks', 'virtualni-balicek' ),
+            'fixed_qty_label' => __( '1 kus', 'virtualni-balicek' ),
             'package_icon_fragment' => 'package-icon.svg',
             'quantity_lock_debounce_ms' => 50,
         ] );

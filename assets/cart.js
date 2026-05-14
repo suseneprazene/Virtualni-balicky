@@ -113,6 +113,8 @@
         });
 
         quantityObserver.observe(container, {
+            attributes: false,
+            characterData: false,
             childList: true,
             subtree: true
         });
