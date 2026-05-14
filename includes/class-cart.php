@@ -155,9 +155,10 @@ class DD_Cart {
         $xsell_id    = 0;
 
         foreach ( self::get_dd_cart_items() as $item ) {
-            if ( ( $item['dd_type'] ?? 'direct' ) === 'direct' ) {
+            $dd_type = $item['dd_type'] ?? 'direct';
+            if ( $dd_type === 'direct' ) {
                 $selected_id = (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 );
-            } elseif ( ( $item['dd_type'] ?? 'direct' ) === 'crosssell' ) {
+            } elseif ( $dd_type === 'crosssell' ) {
                 $xsell_id = (int) ( $item[ self::CART_ITEM_KEY ] ?? 0 );
             }
         }
