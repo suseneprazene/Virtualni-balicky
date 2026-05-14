@@ -11,7 +11,7 @@ class DD_Virtual_Product extends WC_Product {
     }
 
     public function get_type(): string {
-        return 'dd_virtual';
+        return 'simple';
     }
 }
 
@@ -131,7 +131,25 @@ class DD_Cart {
         $product->set_stock_status( 'instock' );
         $product->set_catalog_visibility( 'hidden' );
 
+        // Assign a real product ID so the WooCommerce Store API (block cart) can handle this item.
+        $placeholder_id = self::get_placeholder_product_id();
+        if ( $placeholder_id > 0 ) {
+            $product->set_id( $placeholder_id );
+        }
+
         return $product;
+    }
+
+    /**
+     * Returns the ID of a hidden placeholder WooCommerce product used to give
+     * DD cart items a valid product_id (required by the Store API / block cart).
+     */
+    private static function get_placeholder_product_id(): int {
+        static $pid = null;
+        if ( $pid === null ) {
+            $pid = DD_Installer::get_or_create_placeholder_product();
+        }
+        return (int) $pid;
     }
 
     public static function get_dd_cart_items(): array {
@@ -214,13 +232,15 @@ class DD_Cart {
             $price = 0.0;
         }
 
-        $product  = self::make_virtual_product( $pkg );
+        $product        = self::make_virtual_product( $pkg );
         $product->set_price( $price );
-        $cart_key = WC()->cart->generate_cart_id( 0, 0, 0, [ self::CART_ITEM_KEY => $pkg_id, 'dd_type' => $type ] );
+        $placeholder_id = self::get_placeholder_product_id();
+        $prod_id        = $placeholder_id > 0 ? $placeholder_id : 0;
+        $cart_key       = WC()->cart->generate_cart_id( $prod_id, 0, 0, [ self::CART_ITEM_KEY => $pkg_id, 'dd_type' => $type ] );
 
         WC()->cart->cart_contents[ $cart_key ] = [
             'key'               => $cart_key,
-            'product_id'        => 0,
+            'product_id'        => $prod_id,
             'variation_id'      => 0,
             'variation'         => [],
             'quantity'          => 1,
@@ -270,6 +290,12 @@ class DD_Cart {
         $cart_item['data']              = self::make_virtual_product( $pkg );
         $cart_item[ self::CART_ITEM_KEY ] = $pkg_id;
         $cart_item['dd_type']           = $values['dd_type'] ?? 'direct';
+
+        // Ensure product_id is the placeholder (fixes carts stored before this update).
+        $placeholder_id = self::get_placeholder_product_id();
+        if ( $placeholder_id > 0 ) {
+            $cart_item['product_id'] = $placeholder_id;
+        }
 
         return $cart_item;
     }

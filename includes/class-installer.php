@@ -69,6 +69,51 @@ class DD_Installer {
         self::create_upload_dir();
     }
 
+    /**
+     * Returns the ID of a hidden, virtual WooCommerce product that serves as
+     * a placeholder for DD cart items. Creates it on first call.
+     *
+     * A real product_id is required so that the WooCommerce Store API (used by
+     * the block cart) does not discard the item.
+     */
+    public static function get_or_create_placeholder_product(): int {
+        $stored = (int) get_option( 'dd_placeholder_product_id', 0 );
+        if ( $stored > 0 && wc_get_product( $stored ) ) {
+            return $stored;
+        }
+
+        // Recover from situations where the option was lost.
+        if ( function_exists( 'wc_get_product_id_by_sku' ) ) {
+            $by_sku = wc_get_product_id_by_sku( 'dd-bundle-placeholder' );
+            if ( $by_sku > 0 ) {
+                update_option( 'dd_placeholder_product_id', $by_sku );
+                return $by_sku;
+            }
+        }
+
+        if ( ! class_exists( 'WC_Product_Simple' ) ) {
+            return 0;
+        }
+
+        $product = new WC_Product_Simple();
+        $product->set_name( __( 'Virtuální balíček', 'virtualni-balicek' ) );
+        $product->set_virtual( true );
+        $product->set_catalog_visibility( 'hidden' );
+        $product->set_status( 'publish' );
+        $product->set_price( '0' );
+        $product->set_regular_price( '0' );
+        $product->set_sold_individually( true );
+        $product->set_sku( 'dd-bundle-placeholder' );
+
+        $product_id = $product->save();
+        if ( $product_id > 0 ) {
+            update_option( 'dd_placeholder_product_id', $product_id );
+            return $product_id;
+        }
+
+        return 0;
+    }
+
     public static function deactivate(): void {}
 
     public static function create_upload_dir(): void {

@@ -66,19 +66,67 @@
             });
 
             if (DD_Cart.is_block_cart === '1') {
-                // Aktualizuj naši sekci v DOM
+                // Update our gift section in the DOM.
                 if (res.data && res.data.html) {
                     replaceGiftSection(res.data.html);
+                    init(); // Re-bind listeners on fresh HTML.
                 }
-                // Blokový košík bere data ze Store API; spolehlivý sync je přes reload.
-                window.setTimeout(function () {
-                    window.location.reload();
-                }, 200);
+                // Ask WooCommerce Blocks to re-fetch cart data (totals + items) without
+                // reloading the whole page.
+                refreshBlockCart();
             } else {
-                $(document.body).trigger('wc_update_cart');
+                // Classic shortcode cart: reload the cart table and totals in-place.
+                reloadCartSections();
             }
         }).fail(function () {
             selectionInProgress = false;
+        });
+    }
+
+    /**
+     * Tells WooCommerce Blocks to invalidate its cart data cache so it re-fetches
+     * from the Store API.  Falls back to a WC fragment refresh on older setups.
+     */
+    function refreshBlockCart() {
+        if (window.wp && window.wp.data) {
+            try {
+                window.wp.data
+                    .dispatch('wc/store/cart')
+                    .invalidateResolutionForStoreSelector('getCartData');
+                return;
+            } catch (e) {}
+        }
+        // Fallback: refresh WooCommerce mini-cart fragments.
+        $(document.body).trigger('wc_fragment_refresh');
+    }
+
+    /**
+     * Reloads only the classic cart's item table and totals section via a GET
+     * request to the current page, then swaps the relevant DOM nodes.
+     */
+    function reloadCartSections() {
+        $.get(window.location.href, function (html) {
+            var parser  = new window.DOMParser();
+            var doc     = parser.parseFromString(html, 'text/html');
+
+            var newForm = doc.querySelector('form.woocommerce-cart-form');
+            var curForm = document.querySelector('form.woocommerce-cart-form');
+            if (newForm && curForm) {
+                curForm.replaceWith(newForm);
+            }
+
+            var newTotals = doc.querySelector('.cart_totals');
+            var curTotals = document.querySelector('.cart_totals');
+            if (newTotals && curTotals) {
+                curTotals.replaceWith(newTotals);
+            }
+
+            // Re-bind DD event listeners on the replaced DOM.
+            init();
+            $(document.body).trigger('wc_fragment_refresh');
+        }).fail(function () {
+            // Fallback to the standard WC event.
+            $(document.body).trigger('wc_update_cart');
         });
     }
 
