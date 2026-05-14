@@ -232,11 +232,10 @@ class DD_Cart {
             $price = 0.0;
         }
 
-        $product        = self::make_virtual_product( $pkg );
+        $product  = self::make_virtual_product( $pkg );
         $product->set_price( $price );
-        $placeholder_id = self::get_placeholder_product_id();
-        $prod_id        = $placeholder_id > 0 ? $placeholder_id : 0;
-        $cart_key       = WC()->cart->generate_cart_id( $prod_id, 0, 0, [ self::CART_ITEM_KEY => $pkg_id, 'dd_type' => $type ] );
+        $prod_id  = $product->get_id(); // set by make_virtual_product via placeholder
+        $cart_key = WC()->cart->generate_cart_id( $prod_id, 0, 0, [ self::CART_ITEM_KEY => $pkg_id, 'dd_type' => $type ] );
 
         WC()->cart->cart_contents[ $cart_key ] = [
             'key'               => $cart_key,

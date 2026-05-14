@@ -94,7 +94,9 @@
                     .dispatch('wc/store/cart')
                     .invalidateResolutionForStoreSelector('getCartData');
                 return;
-            } catch (e) {}
+            } catch (e) {
+                console.warn('DD: block cart invalidation failed', e);
+            }
         }
         // Fallback: refresh WooCommerce mini-cart fragments.
         $(document.body).trigger('wc_fragment_refresh');
