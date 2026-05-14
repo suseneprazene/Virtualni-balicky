@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: Dobrovolný dárek
- * Plugin URI:  https://example.com/dobrovolny-darek
+ * Plugin Name: Virtuální balíček
+ * Plugin URI:  https://example.com/virtualni-balicek
  * Description: Mystery box dárky v WooCommerce – zákazník si přikoupí tajný dárek, plugin náhodně vybere dokument a pošle ho e-mailem.
  * Version:     1.1.0
  * Author:      Váš web
- * Text Domain: dobrovolny-darek
+ * Text Domain: virtualni-balicek
  * Domain Path: /languages
  * Requires at least: 6.0
  * Requires PHP: 8.0
@@ -40,12 +40,12 @@ add_action( 'wp_ajax_dd_repair_db', function() {
 add_action( 'plugins_loaded', function () {
     if ( ! class_exists( 'WooCommerce' ) ) {
         add_action( 'admin_notices', function () {
-            echo '<div class="notice notice-error"><p><strong>Dobrovolný dárek:</strong> Vyžaduje aktivní WooCommerce.</p></div>';
+            echo '<div class="notice notice-error"><p><strong>Virtuální balíček:</strong> Vyžaduje aktivní WooCommerce.</p></div>';
         } );
         return;
     }
 
-    load_plugin_textdomain( 'dobrovolny-darek', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+    load_plugin_textdomain( 'virtualni-balicek', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
     DD_Admin::init();
     DD_Cart::init();

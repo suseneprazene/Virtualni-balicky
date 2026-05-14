@@ -135,23 +135,24 @@ class DD_Cart {
 
         ob_start();
         echo '<div class="dd-gift-section" id="dd-gift-section">';
-        echo '<h3 class="dd-gift-heading">🎁 ' . esc_html__( 'Náhodný balíček', 'dobrovolny-darek' )
-            . ' <button type="button" class="dd-info-btn" aria-label="' . esc_attr__( 'Co je náhodný balíček?', 'dobrovolny-darek' ) . '">?</button></h3>';
+        echo '<h3 class="dd-gift-heading">🎁 ' . esc_html__( 'Náhodný balíček', 'virtualni-balicek' )
+            . ' <button type="button" class="dd-info-btn" aria-label="' . esc_attr__( 'Co je náhodný balíček?', 'virtualni-balicek' ) . '">?</button></h3>';
 
         // Info popup
         echo '<div class="dd-info-popup" role="tooltip" hidden>';
         echo '<button type="button" class="dd-info-close" aria-label="Zavřít">×</button>';
-        echo '<strong>' . esc_html__( 'Co je náhodný balíček?', 'dobrovolny-darek' ) . '</strong>';
+        echo '<strong>' . esc_html__( 'Co je náhodný balíček?', 'virtualni-balicek' ) . '</strong>';
         echo '<p>' . esc_html__(
             'Náhodný balíček je digitální balíček překvapení, který si můžeš přidat ke své objednávce. '
             . 'Systém ti nabídne balíčky vztahující se ke kategoriím produktů, které sis právě koupil – takže překvapení bude sedět.',
-            'dobrovolny-darek'
+            'virtualni-balicek'
         ) . '</p>';
         echo '<ul>';
-        echo '<li>' . esc_html__( '🎲 Obsah je tajný – zjistíš ho až z e-mailu po dokončení objednávky.', 'dobrovolny-darek' ) . '</li>';
-        echo '<li>' . esc_html__( '🔁 Každý balíček si koupíš maximálně jednou – nikdy nedostaneš stejný obsah dvakrát.', 'dobrovolny-darek' ) . '</li>';
-        echo '<li>' . esc_html__( '🛒 Můžeš si přidat i balíček z jiné kategorie jako bonus navíc.', 'dobrovolny-darek' ) . '</li>';
-        echo '<li>' . esc_html__( '📩 Dárek obdržíš jako přílohu e-mailu ihned po zpracování a zaplacení objednávky.', 'dobrovolny-darek' ) . '</li>';
+        echo '<li>' . esc_html__( '🎲 Obsah je tajný – zjistíš ho až z e-mailu po dokončení objednávky. Očekávej kulinářský tip či babské rady.', 'virtualni-balicek' ) . '</li>';
+        echo '<li>' . esc_html__( '🔁 Každý balíček si koupíš maximálně jednou – nikdy nedostaneš stejný obsah dvakrát.', 'virtualni-balicek' ) . '</li>';
+        echo '<li>' . esc_html__( '🛒 Můžeš si přidat i balíček z jiné kategorie jako bonus navíc.', 'virtualni-balicek' ) . '</li>';
+        echo '<li>' . esc_html__( '📩 Dárek obdržíš jako přílohu e-mailu ihned po zpracování a zaplacení objednávky. Budu rád, pokud mi dáš na Virtuální balíček zpětnou vazbu - líbil se Ti, koupil by sis jej znovu, nebo je to blbost?', 'virtualni-balicek' ) . '</li>';
+		  
         echo '</ul>';
         echo '</div>';
 
@@ -278,15 +279,15 @@ class DD_Cart {
         $multiple    = count( $packages ) > 1;
 
         if ( $multiple ) {
-            echo '<p class="dd-gift-intro">' . esc_html__( 'Vyber si náhodný balíček z kategorie:', 'dobrovolny-darek' ) . '</p>';
+            echo '<p class="dd-gift-intro">' . esc_html__( 'Vyber si náhodný balíček z kategorie:', 'virtualni-balicek' ) . '</p>';
         }
 
         foreach ( $packages as $pkg ) {
             $ff         = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
             $cat_label  = self::category_label_for_package( $pkg, $product_ids );
             $line_label = $multiple
-                ? sprintf( __( 'Náhodný balíček z kategorie %s', 'dobrovolny-darek' ), $cat_label )
-                : get_option( 'dd_checkbox_label', __( '🎁 Přidat náhodný balíček', 'dobrovolny-darek' ) )
+                ? sprintf( __( 'Náhodný balíček z kategorie %s', 'virtualni-balicek' ), $cat_label )
+                : get_option( 'dd_checkbox_label', __( '🎁 Přidat náhodný balíček', 'virtualni-balicek' ) )
                   . ( $cat_label ? ' – ' . $cat_label : '' );
 
             echo '<div class="dd-gift-row dd-gift-direct">';
@@ -352,12 +353,12 @@ class DD_Cart {
      */
     private static function price_text_html( object $pkg, bool $first_free = false ): string {
         if ( (float) $pkg->price <= 0 ) {
-            return ' <span class="dd-price-free">(' . esc_html__( 'zdarma', 'dobrovolny-darek' ) . ')</span>';
+            return ' <span class="dd-price-free">(' . esc_html__( 'zdarma', 'virtualni-balicek' ) . ')</span>';
         }
         if ( $first_free ) {
             $original = wp_strip_all_tags( wc_price( $pkg->price ) );
             return ' <span class="dd-price-firstfree">(<s>' . $original . '</s>&nbsp;'
-                . esc_html__( 'první zdarma', 'dobrovolny-darek' ) . ')</span>';
+                . esc_html__( 'první zdarma', 'virtualni-balicek' ) . ')</span>';
         }
         return ' <span class="dd-price">(+' . wp_strip_all_tags( wc_price( $pkg->price ) ) . ')</span>';
     }
@@ -429,7 +430,7 @@ class DD_Cart {
             // První dárek zdarma – přeskoč fee
             if ( DD_Package::is_first_free_eligible( $pkg_id, $email ) ) return;
 
-            $label = get_option( 'dd_checkbox_label', __( 'náhodný balíček', 'dobrovolny-darek' ) );
+            $label = get_option( 'dd_checkbox_label', __( 'náhodný balíček', 'virtualni-balicek' ) );
             $cart->add_fee( $label . $suffix, (float) $pkg->price, true );
         };
 
@@ -495,12 +496,16 @@ class DD_Cart {
         .dd-info-popup ul{margin:.2em 0 0;padding-left:1.3em;}
         .dd-info-popup li{margin-bottom:.3em;}
         .dd-info-close{
-            position:absolute;top:.55em;right:.65em;
-            background:none;border:none;cursor:pointer;
-            font-size:.85em;color:#aaa;line-height:1;padding:2px 4px;
-            border-radius:3px;
+            position:absolute !important;top:.45em !important;right:.5em !important;
+            background:none !important;border:none !important;cursor:pointer !important;
+            font-size:1.1em !important;color:#999 !important;line-height:1 !important;
+            padding:0 !important;margin:0 !important;
+            width:auto !important;height:auto !important;
+            min-width:0 !important;min-height:0 !important;
+            box-shadow:none !important;border-radius:0 !important;
+            display:inline !important;
         }
-        .dd-info-close:hover{color:#333;background:#f0f0f0;}
+        .dd-info-close:hover{color:#333 !important;background:none !important;box-shadow:none !important;}
         ';
     }
 }

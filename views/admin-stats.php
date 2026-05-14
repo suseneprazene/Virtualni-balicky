@@ -1,6 +1,6 @@
 <?php defined( 'ABSPATH' ) || exit; ?>
 <div class="wrap dd-admin">
-    <h1>📊 <?php _e( 'Tajné dárky – Statistiky', 'dobrovolny-darek' ); ?></h1>
+    <h1>📊 <?php _e( 'Virtuální balíček – Statistiky', 'virtualni-balicek' ); ?></h1>
 
     <?php
     // Zpracuj mazání statistik
@@ -16,12 +16,12 @@
 
     <?php if ( ! empty( $_GET['dd_resend_done'] ) ) : ?>
         <div class="notice notice-success is-dismissible">
-            <p><?php printf( __( 'Dárek pro objednávku #%d byl znovu odeslán.', 'dobrovolny-darek' ), absint( $_GET['order_id'] ?? 0 ) ); ?></p>
+            <p><?php printf( __( 'Dárek pro objednávku #%d byl znovu odeslán.', 'virtualni-balicek' ), absint( $_GET['order_id'] ?? 0 ) ); ?></p>
         </div>
     <?php endif; ?>
 
     <?php if ( empty( $packages ) ) : ?>
-        <p><?php _e( 'Zatím žádné balíčky.', 'dobrovolny-darek' ); ?></p>
+        <p><?php _e( 'Zatím žádné balíčky.', 'virtualni-balicek' ); ?></p>
     <?php else : ?>
 
     <div class="dd-stats-grid">
@@ -36,30 +36,30 @@
             <div class="dd-stat-card-header">
                 <h2><?php echo esc_html( $pkg->name ); ?></h2>
                 <span class="dd-badge <?php echo $pkg->active ? 'dd-badge-green' : 'dd-badge-gray'; ?>">
-                    <?php echo $pkg->active ? __( 'Aktivní', 'dobrovolny-darek' ) : __( 'Neaktivní', 'dobrovolny-darek' ); ?>
+                    <?php echo $pkg->active ? __( 'Aktivní', 'virtualni-balicek' ) : __( 'Neaktivní', 'virtualni-balicek' ); ?>
                 </span>
             </div>
             <div class="dd-stat-numbers">
                 <div class="dd-stat-box">
                     <span class="dd-stat-num"><?php echo $total_docs; ?></span>
-                    <span class="dd-stat-label"><?php _e( 'dokumentů', 'dobrovolny-darek' ); ?></span>
+                    <span class="dd-stat-label"><?php _e( 'dokumentů', 'virtualni-balicek' ); ?></span>
                 </div>
                 <div class="dd-stat-box">
                     <span class="dd-stat-num"><?php echo $total_sent; ?></span>
-                    <span class="dd-stat-label"><?php _e( 'odeslaných', 'dobrovolny-darek' ); ?></span>
+                    <span class="dd-stat-label"><?php _e( 'odeslaných', 'virtualni-balicek' ); ?></span>
                 </div>
                 <div class="dd-stat-box">
                     <span class="dd-stat-num"><?php echo $uniq_users; ?></span>
-                    <span class="dd-stat-label"><?php _e( 'zákazníků', 'dobrovolny-darek' ); ?></span>
+                    <span class="dd-stat-label"><?php _e( 'zákazníků', 'virtualni-balicek' ); ?></span>
                 </div>
                 <div class="dd-stat-box">
                     <span class="dd-stat-num"><?php echo wc_price( $revenue ); ?></span>
-                    <span class="dd-stat-label"><?php _e( 'příjmy', 'dobrovolny-darek' ); ?></span>
+                    <span class="dd-stat-label"><?php _e( 'příjmy', 'virtualni-balicek' ); ?></span>
                 </div>
             </div>
             <div style="display:flex;gap:.5em;align-items:center;padding:.5em 1em 1em;">
                 <button class="button dd-load-stats" data-package="<?php echo esc_attr( $pkg->id ); ?>">
-                    <?php _e( 'Zobrazit historii odeslání', 'dobrovolny-darek' ); ?>
+                    <?php _e( 'Zobrazit historii odeslání', 'virtualni-balicek' ); ?>
                 </button>
                 <?php if ( $total_sent > 0 ) : ?>
                 <form method="post" style="margin:0" onsubmit="return confirm('Opravdu vymazat všechny statistiky odeslání pro tento balíček? Zákazníci pak mohou dostat stejné dokumenty znovu.');">
@@ -73,10 +73,10 @@
                 <table class="widefat striped dd-stats-table">
                     <thead>
                         <tr>
-                            <th><?php _e( 'E-mail', 'dobrovolny-darek' ); ?></th>
-                            <th><?php _e( 'Dokument', 'dobrovolny-darek' ); ?></th>
-                            <th><?php _e( 'Objednávka', 'dobrovolny-darek' ); ?></th>
-                            <th><?php _e( 'Odesláno', 'dobrovolny-darek' ); ?></th>
+                            <th><?php _e( 'E-mail', 'virtualni-balicek' ); ?></th>
+                            <th><?php _e( 'Dokument', 'virtualni-balicek' ); ?></th>
+                            <th><?php _e( 'Objednávka', 'virtualni-balicek' ); ?></th>
+                            <th><?php _e( 'Odesláno', 'virtualni-balicek' ); ?></th>
                         </tr>
                     </thead>
                     <tbody class="dd-stats-tbody"></tbody>

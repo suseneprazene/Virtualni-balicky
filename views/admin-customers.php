@@ -1,15 +1,15 @@
 <?php defined( 'ABSPATH' ) || exit; ?>
 <div class="wrap dd-admin">
-    <h1>👤 <?php _e( 'Zákazníci – přehled dárků', 'dobrovolny-darek' ); ?></h1>
+    <h1>👤 <?php _e( 'Zákazníci – přehled dárků', 'virtualni-balicek' ); ?></h1>
 
     <div class="dd-customer-search-wrap">
-        <p><?php _e( 'Zadej e-mail zákazníka a uvidíš, které dárky již obdržel a kolik mu zbývá.', 'dobrovolny-darek' ); ?></p>
+        <p><?php _e( 'Zadej e-mail zákazníka a uvidíš, které dárky již obdržel a kolik mu zbývá.', 'virtualni-balicek' ); ?></p>
         <div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;">
             <input type="email" id="dd-customer-email" class="regular-text"
                    placeholder="zakaznik@email.cz"
                    value="<?php echo esc_attr( $_GET['email'] ?? '' ); ?>">
             <button class="button button-primary" id="dd-customer-search-btn">
-                🔍 <?php _e( 'Vyhledat', 'dobrovolny-darek' ); ?>
+                🔍 <?php _e( 'Vyhledat', 'virtualni-balicek' ); ?>
             </button>
         </div>
     </div>

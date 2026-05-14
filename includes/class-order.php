@@ -134,7 +134,7 @@ class DD_Order {
             $order->update_meta_data( $status_key, 'exhausted' );
             $order->save();
             $order->add_order_note( sprintf(
-                __( 'Tajný dárek [%s]: zákazník vyčerpal všechny dokumenty.', 'dobrovolny-darek' ),
+                __( 'Tajný dárek [%s]: zákazník vyčerpal všechny dokumenty.', 'virtualni-balicek' ),
                 $package->name
             ) );
             return;
@@ -151,14 +151,14 @@ class DD_Order {
             $order->update_meta_data( $doc_name_key, $document->name );
             $order->save();
             $order->add_order_note( sprintf(
-                __( 'Tajný dárek [%s] odeslán: "%s" → %s', 'dobrovolny-darek' ),
+                __( 'Tajný dárek [%s] odeslán: "%s" → %s', 'virtualni-balicek' ),
                 $package->name, $document->name, $email
             ) );
         } else {
             $order->update_meta_data( $status_key, 'error_email' );
             $order->save();
             $order->add_order_note( sprintf(
-                __( 'Tajný dárek [%s]: chyba při odesílání e-mailu.', 'dobrovolny-darek' ),
+                __( 'Tajný dárek [%s]: chyba při odesílání e-mailu.', 'virtualni-balicek' ),
                 $package->name
             ) );
         }
@@ -229,16 +229,16 @@ class DD_Order {
 
     public static function show_order_meta( WC_Order $order ): void {
         $labels = [
-            'pending'          => '⏳ ' . __( 'Čeká na odeslání', 'dobrovolny-darek' ),
-            'sent'             => '✅ ' . __( 'Odesláno', 'dobrovolny-darek' ),
-            'exhausted'        => '⚠️ ' . __( 'Zákazník vyčerpal všechny dokumenty', 'dobrovolny-darek' ),
-            'error_no_package' => '❌ ' . __( 'Balíček nenalezen', 'dobrovolny-darek' ),
-            'error_email'      => '❌ ' . __( 'Chyba e-mailu', 'dobrovolny-darek' ),
+            'pending'          => '⏳ ' . __( 'Čeká na odeslání', 'virtualni-balicek' ),
+            'sent'             => '✅ ' . __( 'Odesláno', 'virtualni-balicek' ),
+            'exhausted'        => '⚠️ ' . __( 'Zákazník vyčerpal všechny dokumenty', 'virtualni-balicek' ),
+            'error_no_package' => '❌ ' . __( 'Balíček nenalezen', 'virtualni-balicek' ),
+            'error_email'      => '❌ ' . __( 'Chyba e-mailu', 'virtualni-balicek' ),
         ];
 
         $gifts = [
-            [ 'label' => __( 'Tajný dárek', 'dobrovolny-darek' ),      'pkg_key' => '_dd_package_id',      'status_key' => '_dd_gift_status',      'doc_key' => '_dd_document_name' ],
-            [ 'label' => __( 'Cross-sell dárek', 'dobrovolny-darek' ), 'pkg_key' => '_dd_xsell_package_id', 'status_key' => '_dd_xsell_gift_status', 'doc_key' => '_dd_xsell_document_name' ],
+            [ 'label' => __( 'Tajný dárek', 'virtualni-balicek' ),      'pkg_key' => '_dd_package_id',      'status_key' => '_dd_gift_status',      'doc_key' => '_dd_document_name' ],
+            [ 'label' => __( 'Cross-sell dárek', 'virtualni-balicek' ), 'pkg_key' => '_dd_xsell_package_id', 'status_key' => '_dd_xsell_gift_status', 'doc_key' => '_dd_xsell_document_name' ],
         ];
 
         $doc_id_key_map = [
@@ -267,7 +267,7 @@ class DD_Order {
                         'dd_admin_nonce',
                         'nonce'
                     );
-                    echo ' <a href="' . esc_url( $download_url ) . '" title="' . esc_attr__( 'Stáhnout dokument', 'dobrovolny-darek' ) . '">📥 ' . esc_html__( 'Stáhnout', 'dobrovolny-darek' ) . '</a>';
+                    echo ' <a href="' . esc_url( $download_url ) . '" title="' . esc_attr__( 'Stáhnout dokument', 'virtualni-balicek' ) . '">📥 ' . esc_html__( 'Stáhnout', 'virtualni-balicek' ) . '</a>';
                 }
             }
 
@@ -279,7 +279,7 @@ class DD_Order {
                     ),
                     'dd_resend_' . $order->get_id()
                 );
-                echo ' <a href="' . esc_url( $resend_url ) . '">' . __( 'Znovu odeslat', 'dobrovolny-darek' ) . '</a>';
+                echo ' <a href="' . esc_url( $resend_url ) . '">' . __( 'Znovu odeslat', 'virtualni-balicek' ) . '</a>';
             }
             echo '</div>';
         }

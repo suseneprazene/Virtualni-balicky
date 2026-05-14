@@ -98,9 +98,15 @@
     // ── Nahrání dokumentu ─────────────────────────────────────────────────────
     $('#dd-upload-btn').on('click', function () {
         const file = $('#dd-doc-file')[0].files[0];
-        const packageId = $('#dd-pkg-id').val();
+        const packageId = parseInt( $('#dd-pkg-id').val(), 10 );
         if (!file) { alert('Vyberte soubor.'); return; }
-        if (!packageId || packageId === '0') { alert('Nejdřív uložte balíček.'); return; }
+        if (!packageId || packageId <= 0) {
+            // Balíček ještě nebyl uložen – zkus ho uložit automaticky
+            const name = $('#dd-pkg-name').val().trim();
+            if (!name) { alert('Nejdřív vyplňte a uložte název balíčku.'); return; }
+            alert('Balíček ještě nebyl uložen. Klikněte nejdřív na „Uložit balíček".');
+            return;
+        }
 
         const progress = $('#dd-upload-progress').text(DD.strings.uploading).show();
         const self = $(this).prop('disabled', true);

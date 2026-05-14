@@ -22,12 +22,33 @@ class DD_Admin {
     }
 
     public static function register_menu(): void {
-        add_menu_page( __( 'Dobrovolný dárek', 'dobrovolny-darek' ), __( 'Tajné dárky', 'dobrovolny-darek' ), 'manage_woocommerce', 'dobrovolny-darek', [ __CLASS__, 'page_packages' ], 'dashicons-gift', 56 );
-        add_submenu_page( 'dobrovolny-darek', __( 'Balíčky', 'dobrovolny-darek' ),    __( 'Balíčky', 'dobrovolny-darek' ),    'manage_woocommerce', 'dobrovolny-darek',          [ __CLASS__, 'page_packages' ] );
-        add_submenu_page( 'dobrovolny-darek', __( 'Statistiky', 'dobrovolny-darek' ), __( 'Statistiky', 'dobrovolny-darek' ), 'manage_woocommerce', 'dobrovolny-darek-stats',    [ __CLASS__, 'page_stats' ] );
-        add_submenu_page( 'dobrovolny-darek', __( 'Zákazníci', 'dobrovolny-darek' ), __( 'Zákazníci', 'dobrovolny-darek' ), 'manage_woocommerce', 'dobrovolny-darek-customers', [ __CLASS__, 'page_customers' ] );
-        add_submenu_page( 'dobrovolny-darek', __( 'Diagnostika', 'dobrovolny-darek' ),  __( 'Diagnostika', 'dobrovolny-darek' ),  'manage_woocommerce', 'dobrovolny-darek-debug',    [ __CLASS__, 'page_debug' ] );
-        add_submenu_page( 'dobrovolny-darek', __( 'Nastavení', 'dobrovolny-darek' ),  __( 'Nastavení', 'dobrovolny-darek' ),  'manage_woocommerce', 'dobrovolny-darek-settings', [ __CLASS__, 'page_settings' ] );
+        add_menu_page( __( 'Virtuální balíček', 'virtualni-balicek' ), __( 'Virtuální balíček', 'virtualni-balicek' ), 'manage_woocommerce', 'dobrovolny-darek', [ __CLASS__, 'page_packages' ], 'dashicons-gift', 56 );
+        add_submenu_page( 'dobrovolny-darek', __( 'Balíčky', 'virtualni-balicek' ),    __( 'Balíčky', 'virtualni-balicek' ),    'manage_woocommerce', 'dobrovolny-darek',          [ __CLASS__, 'page_packages' ] );
+        add_submenu_page( 'dobrovolny-darek', __( 'Statistiky', 'virtualni-balicek' ), __( 'Statistiky', 'virtualni-balicek' ), 'manage_woocommerce', 'dobrovolny-darek-stats',    [ __CLASS__, 'page_stats' ] );
+        add_submenu_page( 'dobrovolny-darek', __( 'Zákazníci', 'virtualni-balicek' ), __( 'Zákazníci', 'virtualni-balicek' ), 'manage_woocommerce', 'dobrovolny-darek-customers', [ __CLASS__, 'page_customers' ] );
+        add_submenu_page( 'dobrovolny-darek', __( 'Diagnostika', 'virtualni-balicek' ),  __( 'Diagnostika', 'virtualni-balicek' ),  'manage_woocommerce', 'dobrovolny-darek-debug',    [ __CLASS__, 'page_debug' ] );
+        add_submenu_page( 'dobrovolny-darek', __( 'Nastavení', 'virtualni-balicek' ),  __( 'Nastavení', 'virtualni-balicek' ),  'manage_woocommerce', 'dobrovolny-darek-settings', [ __CLASS__, 'page_settings' ] );
+
+        // Automaticky vytvoř/aktualizuj tabulky pokud chybí (např. po přejmenování pluginu)
+        self::maybe_install();
+    }
+
+    /**
+     * Zkontroluje DB verzi a spustí install pokud je plugin aktualizován nebo
+     * tabulky ještě neexistují (stav po přejmenování bez deaktivace/aktivace).
+     */
+    private static function maybe_install(): void {
+        global $wpdb;
+
+        // Zkontroluj jestli sloupec first_free existuje (přidán v 1.1.0)
+        $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$wpdb->prefix}dd_packages` LIKE 'first_free'" );
+
+        if ( get_option( 'dd_db_version' ) !== DD_VERSION
+            || ! $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}dd_packages'" )
+            || empty( $col )
+        ) {
+            DD_Installer::activate();
+        }
     }
 
     public static function enqueue_assets( string $hook ): void {
@@ -116,10 +137,32 @@ class DD_Admin {
         global $wpdb;
         $table = $wpdb->prefix . 'dd_packages';
 
+        // Ochrana: pokud tabulka neexistuje, automaticky ji vytvoř
+        $exists = $wpdb->get_var( "SHOW TABLES LIKE '$table'" );
+        if ( ! $exists ) {
+            DD_Installer::activate();
+        }
+
         if ( $id > 0 ) {
-            $wpdb->update( $table, [ 'name' => $name, 'description' => $desc, 'price' => $price, 'first_free' => $first_free ], [ 'id' => $id ], [ '%s', '%s', '%f', '%d' ], [ '%d' ] );
+            $result = $wpdb->update(
+                $table,
+                [ 'name' => $name, 'description' => $desc, 'price' => $price, 'first_free' => $first_free ],
+                [ 'id' => $id ],
+                [ '%s', '%s', '%f', '%d' ],
+                [ '%d' ]
+            );
+            if ( $result === false ) {
+                wp_send_json_error( 'Chyba při ukládání: ' . $wpdb->last_error );
+            }
         } else {
-            $wpdb->insert( $table, [ 'name' => $name, 'description' => $desc, 'price' => $price, 'active' => 1, 'first_free' => $first_free ], [ '%s', '%s', '%f', '%d', '%d' ] );
+            $result = $wpdb->insert(
+                $table,
+                [ 'name' => $name, 'description' => $desc, 'price' => $price, 'active' => 1, 'first_free' => $first_free ],
+                [ '%s', '%s', '%f', '%d', '%d' ]
+            );
+            if ( $result === false || ! $wpdb->insert_id ) {
+                wp_send_json_error( 'Chyba při vytváření balíčku: ' . $wpdb->last_error );
+            }
             $id = $wpdb->insert_id;
         }
 

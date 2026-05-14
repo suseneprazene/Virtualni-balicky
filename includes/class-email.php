@@ -17,7 +17,7 @@ class DD_Email {
         $to      = $order->get_billing_email();
         $name    = $order->get_billing_first_name();
         $subject = self::parse_template(
-            get_option( 'dd_email_subject', __( '🎁 Váš tajný dárek z objednávky #{order_id}', 'dobrovolny-darek' ) ),
+            get_option( 'dd_email_subject', __( '🎁 Váš tajný dárek z objednávky #{order_id}', 'virtualni-balicek' ) ),
             $order, $document
         );
         $body    = self::parse_template(
@@ -61,11 +61,11 @@ class DD_Email {
      * Výchozí tělo e-mailu.
      */
     public static function default_body(): string {
-        return '<p>' . __( 'Dobrý den, {customer_name}!', 'dobrovolny-darek' ) . '</p>
-<p>' . __( 'Děkujeme za Vaši objednávku č. {order_id}.', 'dobrovolny-darek' ) . '</p>
-<p>' . __( 'Jak jste si přál(a), přikládáme Váš <strong>tajný dárek</strong> – najdete ho v příloze tohoto e-mailu.', 'dobrovolny-darek' ) . '</p>
-<p>' . __( 'Doufáme, že Vás potěší!', 'dobrovolny-darek' ) . '</p>
-<p>' . __( 'S přáním hezkého dne,<br>{site_name}', 'dobrovolny-darek' ) . '</p>';
+        return '<p>' . __( 'Dobrý den, {customer_name}!', 'virtualni-balicek' ) . '</p>
+<p>' . __( 'Děkujeme za Vaši objednávku č. {order_id}.', 'virtualni-balicek' ) . '</p>
+<p>' . __( 'Jak jste si přál(a), přikládáme Váš <strong>tajný dárek</strong> – najdete ho v příloze tohoto e-mailu.', 'virtualni-balicek' ) . '</p>
+<p>' . __( 'Doufáme, že Vás potěší!', 'virtualni-balicek' ) . '</p>
+<p>' . __( 'S přáním hezkého dne,<br>{site_name}', 'virtualni-balicek' ) . '</p>';
     }
 
     /**

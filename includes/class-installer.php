@@ -59,6 +59,12 @@ class DD_Installer {
         dbDelta( $sql_rules );
         dbDelta( $sql_sent );
 
+        // Pojistka: přidej first_free pokud ho dbDelta nepřidal (existující starší tabulka)
+        $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$wpdb->prefix}dd_packages` LIKE 'first_free'" );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE `{$wpdb->prefix}dd_packages` ADD COLUMN `first_free` TINYINT(1) NOT NULL DEFAULT 0 AFTER `active`" );
+        }
+
         update_option( 'dd_db_version', DD_VERSION );
         self::create_upload_dir();
     }
