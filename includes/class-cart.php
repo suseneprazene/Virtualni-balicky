@@ -207,10 +207,16 @@ class DD_Cart {
     }
 
     public static function add_package_to_cart( int $pkg_id, string $type = 'direct' ): ?string {
-        if ( ! WC()->cart || $pkg_id <= 0 ) return null;
+        if ( ! WC()->cart || $pkg_id <= 0 ) {
+            error_log( '[DD_Cart] add_package_to_cart: cart not available or invalid pkg_id=' . $pkg_id );
+            return null;
+        }
 
         $pkg = DD_Package::get( $pkg_id );
-        if ( ! $pkg || ! $pkg->active ) return null;
+        if ( ! $pkg || ! $pkg->active ) {
+            error_log( '[DD_Cart] add_package_to_cart: package not found or inactive pkg_id=' . $pkg_id );
+            return null;
+        }
 
         $type = $type === 'crosssell' ? 'crosssell' : 'direct';
 
@@ -239,6 +245,7 @@ class DD_Cart {
         $product->set_price( $price );
         $prod_id  = $product->get_id(); // set by make_virtual_product via placeholder
         if ( $prod_id <= 0 ) {
+            error_log( '[DD_Cart] add_package_to_cart: placeholder product not found (prod_id=0) for pkg_id=' . $pkg_id . '. Run plugin deactivation/reactivation to recreate it.' );
             return null;
         }
 
@@ -253,10 +260,13 @@ class DD_Cart {
             ]
         );
         if ( ! $cart_key ) {
+            $wc_errors = array_column( wc_get_notices( 'error' ), 'notice' );
+            error_log( '[DD_Cart] add_package_to_cart: WC add_to_cart returned false for prod_id=' . $prod_id . ' pkg_id=' . $pkg_id . '. WC notices: ' . wp_json_encode( $wc_errors ) );
             return null;
         }
         $added_item = WC()->cart->get_cart_item( $cart_key );
         if ( empty( $added_item[ self::CART_ITEM_KEY ] ) ) {
+            error_log( '[DD_Cart] add_package_to_cart: cart item missing dd_package_id after add_to_cart. cart_key=' . $cart_key );
             return null;
         }
 
@@ -843,9 +853,17 @@ class DD_Cart {
         }
 
         if ( $checked ) {
+            wc_clear_notices();
             $cart_key = self::add_package_to_cart( $package_id, $type );
             if ( ! $cart_key ) {
-                wp_send_json_error( [ 'message' => __( 'Balíček se nepodařilo přidat do košíku.', 'virtualni-balicek' ) ] );
+                $wc_errors = array_values( array_map(
+                    static fn( array $n ): string => wp_strip_all_tags( $n['notice'] ?? '' ),
+                    wc_get_notices( 'error' )
+                ) );
+                wp_send_json_error( [
+                    'message'    => __( 'Balíček se nepodařilo přidat do košíku.', 'virtualni-balicek' ),
+                    'wc_notices' => $wc_errors,
+                ] );
             }
         } else {
             self::remove_package_from_cart( $package_id, $type );

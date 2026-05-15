@@ -130,6 +130,8 @@
                     packageId: packageId,
                     type: type,
                     checked: checked,
+                    message: res && res.data && res.data.message ? res.data.message : null,
+                    wcNotices: res && res.data && res.data.wc_notices ? res.data.wc_notices : [],
                     response: res && res.data ? res.data : res
                 });
                 return;
