@@ -254,7 +254,9 @@ class DD_Cart {
 
         $email   = self::get_customer_email();
         $price   = (float) $pkg->price;
-        $is_free = $email ? DD_Package::is_first_free_eligible( $pkg_id, $email ) : false;
+        $is_free = $email
+            && DD_Package::is_first_free_eligible( $pkg_id, $email )
+            && self::get_cart_first_free_pkg_id( $email ) === null;
         if ( $is_free ) {
             $price = 0.0;
         }
@@ -340,9 +342,30 @@ class DD_Cart {
         return $cart_item;
     }
 
+    /**
+     * Vrátí ID balíčku z košíku, který jako první splňuje podmínky pro "první zdarma".
+     * Napříč celým košíkem existuje maximálně jeden takový slot – první nalezený vyhraje.
+     * Balíčky bez first_free = 1 nebo zákazníci, kteří benefit již čerpali, sem nespadají.
+     *
+     * @param string $email E-mail zákazníka.
+     * @return int|null ID balíčku, nebo null, pokud žádný nenaplnil podmínky.
+     */
+    private static function get_cart_first_free_pkg_id( string $email ): ?int {
+        if ( ! $email || ! WC()->cart ) return null;
+        foreach ( WC()->cart->get_cart() as $item ) {
+            if ( ! isset( $item[ self::CART_ITEM_KEY ] ) ) continue;
+            $pkg_id = (int) $item[ self::CART_ITEM_KEY ];
+            if ( DD_Package::is_first_free_eligible( $pkg_id, $email ) ) {
+                return $pkg_id;
+            }
+        }
+        return null;
+    }
+
     public static function set_virtual_item_prices( WC_Cart $cart ): void {
         if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
-        $email = self::get_customer_email();
+        $email       = self::get_customer_email();
+        $free_pkg_id = $email ? self::get_cart_first_free_pkg_id( $email ) : null;
         foreach ( $cart->get_cart() as $key => $item ) {
             if ( ! isset( $item[ self::CART_ITEM_KEY ] ) || ! isset( $item['data'] ) || $item['data'] === false ) {
                 continue;
@@ -356,7 +379,7 @@ class DD_Cart {
                 $cart->cart_contents[ $key ]['quantity'] = 1;
             }
             $price   = (float) $pkg->price;
-            $is_free = $email ? DD_Package::is_first_free_eligible( $pkg_id, $email ) : false;
+            $is_free = ( $free_pkg_id !== null && $pkg_id === $free_pkg_id );
             if ( $is_free ) {
                 $price = 0.0;
             }
@@ -423,8 +446,9 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $price_html;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $price_html;
-        $email = self::get_customer_email();
-        $ff    = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
+        $email       = self::get_customer_email();
+        $free_pkg_id = $email ? self::get_cart_first_free_pkg_id( $email ) : null;
+        $ff          = ( $free_pkg_id !== null && (int) $pkg->id === $free_pkg_id );
         return self::price_text_html( $pkg, $ff );
     }
 
@@ -671,8 +695,13 @@ class DD_Cart {
             echo '<p class="dd-gift-intro">' . esc_html__( 'Vyber si náhodný balíček z kategorie:', 'virtualni-balicek' ) . '</p>';
         }
 
+        $free_pkg_id = $email ? self::get_cart_first_free_pkg_id( $email ) : null;
+
         foreach ( $packages as $pkg ) {
-            $ff         = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
+            $pkg_int   = (int) $pkg->id;
+            $ff        = $email
+                && DD_Package::is_first_free_eligible( $pkg_int, $email )
+                && ( $free_pkg_id === null || $free_pkg_id === $pkg_int );
             $cat_label  = self::category_label_for_package( $pkg, $product_ids );
             $line_label = $multiple
                 ? sprintf( __( 'Náhodný balíček z kategorie %s', 'virtualni-balicek' ), $cat_label )
@@ -834,8 +863,12 @@ class DD_Cart {
     }
 
     private static function render_crosssell_checkbox( object $pkg, bool $checked, bool $selection_locked ): void {
-        $email    = self::get_customer_email();
-        $ff       = $email ? DD_Package::is_first_free_eligible( (int) $pkg->id, $email ) : false;
+        $email       = self::get_customer_email();
+        $free_pkg_id = $email ? self::get_cart_first_free_pkg_id( $email ) : null;
+        $pkg_int     = (int) $pkg->id;
+        $ff          = $email
+            && DD_Package::is_first_free_eligible( $pkg_int, $email )
+            && ( $free_pkg_id === null || $free_pkg_id === $pkg_int );
         $template = get_option( 'dd_crosssell_label', 'Zajímá tě také náhodný balíček ze sekce {package_name}?' );
         $label    = str_replace( '{package_name}', $pkg->name, $template );
         ?>
