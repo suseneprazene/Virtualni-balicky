@@ -104,6 +104,8 @@ class DD_Installer {
         $product->set_status( 'publish' );
         $product->set_price( '0' );
         $product->set_regular_price( '0' );
+        // DD balíčky potřebují vlastní řádky (direct + crosssell), proto placeholder
+        // nesmí být sold individually, jinak WooCommerce může blokovat další přidání.
         $product->set_sold_individually( false );
         $product->set_manage_stock( false );
         $product->set_stock_status( 'instock' );

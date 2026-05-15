@@ -255,7 +255,8 @@ class DD_Cart {
         if ( ! $cart_key ) {
             return null;
         }
-        if ( empty( WC()->cart->cart_contents[ $cart_key ][ self::CART_ITEM_KEY ] ) ) {
+        $added_item = WC()->cart->get_cart_item( $cart_key );
+        if ( empty( $added_item[ self::CART_ITEM_KEY ] ) ) {
             return null;
         }
 
