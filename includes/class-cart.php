@@ -258,7 +258,10 @@ class DD_Cart {
         $product->set_price( $price );
         $prod_id  = $product->get_id(); // set by make_virtual_product via placeholder
         if ( $prod_id <= 0 ) {
-            error_log( '[DD_Cart] add_package_to_cart: placeholder product not found (prod_id=0) for pkg_id=' . $pkg_id . '. Run plugin deactivation/reactivation to recreate it.' );
+            error_log( sprintf(
+                '[DD_Cart] add_package_to_cart: placeholder product not found (prod_id=0) for pkg_id=%d. Deactivate and reactivate the plugin to recreate it.',
+                $pkg_id
+            ) );
             return null;
         }
 
@@ -274,7 +277,12 @@ class DD_Cart {
         );
         if ( ! $cart_key ) {
             $wc_errors = self::get_wc_error_notice_texts();
-            error_log( '[DD_Cart] add_package_to_cart: WC add_to_cart returned false for prod_id=' . $prod_id . ' pkg_id=' . $pkg_id . '. WC notices: ' . wp_json_encode( $wc_errors ) );
+            error_log( sprintf(
+                '[DD_Cart] add_package_to_cart: WC add_to_cart returned false for prod_id=%d pkg_id=%d. WC notices: %s',
+                $prod_id,
+                $pkg_id,
+                wp_json_encode( $wc_errors )
+            ) );
             return null;
         }
         $added_item = WC()->cart->get_cart_item( $cart_key );
