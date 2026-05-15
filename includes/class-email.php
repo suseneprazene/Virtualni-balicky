@@ -14,6 +14,27 @@ class DD_Email {
      * @return bool True při úspěchu.
      */
     public static function send_gift( WC_Order $order, object $package, object $document ): bool {
+        return self::send_gifts_combined( $order, [
+            [
+                'package'  => $package,
+                'document' => $document,
+            ],
+        ] );
+    }
+
+    /**
+     * Odešle jeden e-mail s více dárky jako přílohami.
+     *
+     * @param array<int,array{package:object,document:object}> $gifts
+     * @return bool True při úspěchu.
+     */
+    public static function send_gifts_combined( WC_Order $order, array $gifts ): bool {
+        if ( empty( $gifts ) ) {
+            return false;
+        }
+
+        $first_gift = $gifts[0];
+        $document   = $first_gift['document'];
         $to      = $order->get_billing_email();
         $name    = $order->get_billing_first_name();
         $subject = self::parse_template(
@@ -33,11 +54,37 @@ class DD_Email {
 
         // Příloha
         $attachments = [];
-        if ( file_exists( $document->file_path ) ) {
-            $attachments[] = $document->file_path;
+        $name_map     = [];
+        foreach ( $gifts as $gift ) {
+            $gift_document = $gift['document'] ?? null;
+            if ( ! $gift_document || empty( $gift_document->file_path ) || ! file_exists( $gift_document->file_path ) ) {
+                continue;
+            }
+
+            $attachments[] = $gift_document->file_path;
+            $ext           = strtolower( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_EXTENSION ) );
+            $filename      = sanitize_file_name( (string) $gift_document->name );
+            if ( $ext !== '' ) {
+                $filename .= '.' . $ext;
+            }
+            $name_map[ $gift_document->file_path ] = $filename;
         }
 
+        $rename_cb = static function ( $phpmailer ) use ( $name_map ): void {
+            if ( empty( $name_map ) || empty( $phpmailer->attachment ) || ! is_array( $phpmailer->attachment ) ) {
+                return;
+            }
+
+            foreach ( $phpmailer->attachment as $i => $att ) {
+                $path = $att[0] ?? '';
+                if ( $path !== '' && isset( $name_map[ $path ] ) ) {
+                    $phpmailer->attachment[ $i ][2] = $name_map[ $path ];
+                }
+            }
+        };
+        add_action( 'phpmailer_init', $rename_cb );
         $result = wp_mail( $to, $subject, $message, $headers, $attachments );
+        remove_action( 'phpmailer_init', $rename_cb );
 
         return (bool) $result;
     }

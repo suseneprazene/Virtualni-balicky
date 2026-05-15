@@ -108,21 +108,86 @@ class DD_Order {
         $order = wc_get_order( $order_id );
         if ( ! $order ) return;
 
-        self::dispatch_gift(
-            $order,
+        $gifts_to_send = [];
+
+        $prepare = function( int $package_id, string $status_key, string $doc_id_key, string $doc_name_key ) use ( $order, &$gifts_to_send ): void {
+            if ( ! $package_id ) return;
+            if ( $order->get_meta( $status_key ) === 'sent' ) return;
+
+            $package = DD_Package::get( $package_id );
+            if ( ! $package ) {
+                $order->update_meta_data( $status_key, 'error_no_package' );
+                $order->save();
+                return;
+            }
+
+            $email    = $order->get_billing_email();
+            $document = DD_Package::pick_random_unsent( $package_id, $email );
+
+            if ( ! $document ) {
+                $order->update_meta_data( $status_key, 'exhausted' );
+                $order->save();
+                $order->add_order_note( sprintf(
+                    __( 'Tajný dárek [%s]: zákazník vyčerpal všechny dokumenty.', 'virtualni-balicek' ),
+                    $package->name
+                ) );
+                return;
+            }
+
+            $gifts_to_send[] = [
+                'package'      => $package,
+                'document'     => $document,
+                'status_key'   => $status_key,
+                'doc_id_key'   => $doc_id_key,
+                'doc_name_key' => $doc_name_key,
+            ];
+        };
+
+        $prepare(
             (int) $order->get_meta( '_dd_package_id' ),
             '_dd_gift_status',
             '_dd_document_id',
             '_dd_document_name'
         );
-
-        self::dispatch_gift(
-            $order,
+        $prepare(
             (int) $order->get_meta( '_dd_xsell_package_id' ),
             '_dd_xsell_gift_status',
             '_dd_xsell_document_id',
             '_dd_xsell_document_name'
         );
+
+        if ( empty( $gifts_to_send ) ) return;
+
+        $sent  = DD_Email::send_gifts_combined( $order, $gifts_to_send );
+        $email = $order->get_billing_email();
+
+        foreach ( $gifts_to_send as $gift ) {
+            if ( $sent ) {
+                $user_id = $order->get_user_id() ?: null;
+                DD_Package::record_sent(
+                    (int) $gift['package']->id,
+                    (int) $gift['document']->id,
+                    $email,
+                    $order->get_id(),
+                    $user_id
+                );
+                $order->update_meta_data( $gift['status_key'],   'sent' );
+                $order->update_meta_data( $gift['doc_id_key'],   $gift['document']->id );
+                $order->update_meta_data( $gift['doc_name_key'], $gift['document']->name );
+                $order->save();
+                $order->add_order_note( sprintf(
+                    __( 'Tajný dárek [%s] odeslán: "%s" → %s', 'virtualni-balicek' ),
+                    $gift['package']->name, $gift['document']->name, $email
+                ) );
+            } else {
+                $order->update_meta_data( $gift['status_key'], 'error_email' );
+                $order->save();
+                $order->add_order_note( sprintf(
+                    __( 'Tajný dárek [%s]: chyba při odesílání e-mailu.', 'virtualni-balicek' ),
+                    $gift['package']->name
+                ) );
+            }
+        }
     }
 
     private static function dispatch_gift(
