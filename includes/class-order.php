@@ -110,7 +110,7 @@ class DD_Order {
 
         $gifts_to_send = [];
 
-        $prepare = function( int $package_id, string $status_key, string $doc_id_key, string $doc_name_key ) use ( $order, &$gifts_to_send ): void {
+        $collectGiftIfEligible = function( int $package_id, string $status_key, string $doc_id_key, string $doc_name_key ) use ( $order, &$gifts_to_send ): void {
             if ( ! $package_id ) return;
             if ( $order->get_meta( $status_key ) === 'sent' ) return;
 
@@ -143,13 +143,13 @@ class DD_Order {
             ];
         };
 
-        $prepare(
+        $collectGiftIfEligible(
             (int) $order->get_meta( '_dd_package_id' ),
             '_dd_gift_status',
             '_dd_document_id',
             '_dd_document_name'
         );
-        $prepare(
+        $collectGiftIfEligible(
             (int) $order->get_meta( '_dd_xsell_package_id' ),
             '_dd_xsell_gift_status',
             '_dd_xsell_document_id',

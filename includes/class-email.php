@@ -54,7 +54,7 @@ class DD_Email {
 
         // Příloha
         $attachments = [];
-        $name_map     = [];
+        $nameMap     = [];
         foreach ( $gifts as $gift ) {
             $gift_document = $gift['document'] ?? null;
             if ( ! $gift_document || empty( $gift_document->file_path ) || ! file_exists( $gift_document->file_path ) ) {
@@ -63,28 +63,31 @@ class DD_Email {
 
             $attachments[] = $gift_document->file_path;
             $ext           = strtolower( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_EXTENSION ) );
-            $filename      = sanitize_file_name( (string) $gift_document->name );
+            $baseFilename  = sanitize_file_name( (string) pathinfo( (string) $gift_document->name, PATHINFO_FILENAME ) );
+            $filename      = $baseFilename !== '' ? $baseFilename : sanitize_file_name( (string) $gift_document->name );
             if ( $ext !== '' ) {
                 $filename .= '.' . $ext;
             }
-            $name_map[ $gift_document->file_path ] = $filename;
+            $nameMap[ $gift_document->file_path ] = $filename;
         }
 
-        $rename_cb = static function ( $phpmailer ) use ( $name_map ): void {
-            if ( empty( $name_map ) || empty( $phpmailer->attachment ) || ! is_array( $phpmailer->attachment ) ) {
+        $renameCallback = static function ( $phpmailer ) use ( $nameMap ): void {
+            if ( empty( $nameMap ) || ! is_array( $phpmailer->attachment ?? null ) || $phpmailer->attachment === [] ) {
                 return;
             }
 
             foreach ( $phpmailer->attachment as $i => $att ) {
                 $path = $att[0] ?? '';
-                if ( $path !== '' && isset( $name_map[ $path ] ) ) {
-                    $phpmailer->attachment[ $i ][2] = $name_map[ $path ];
+                if ( $path !== '' && isset( $nameMap[ $path ] ) ) {
+                    if ( ( $att[2] ?? '' ) !== $nameMap[ $path ] ) {
+                        $phpmailer->attachment[ $i ][2] = $nameMap[ $path ];
+                    }
                 }
             }
         };
-        add_action( 'phpmailer_init', $rename_cb );
+        add_action( 'phpmailer_init', $renameCallback );
         $result = wp_mail( $to, $subject, $message, $headers, $attachments );
-        remove_action( 'phpmailer_init', $rename_cb );
+        remove_action( 'phpmailer_init', $renameCallback );
 
         return (bool) $result;
     }
