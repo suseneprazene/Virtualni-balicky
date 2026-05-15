@@ -4,9 +4,11 @@ defined( 'ABSPATH' ) || exit;
 class DD_Debug {
 
     public static function init(): void {
-        add_action( 'wp_ajax_dd_debug_order',   [ __CLASS__, 'ajax_debug_order' ] );
-        add_action( 'wp_ajax_dd_force_process', [ __CLASS__, 'ajax_force_process' ] );
-        add_action( 'wp_ajax_dd_test_email',    [ __CLASS__, 'ajax_test_email' ] );
+        add_action( 'wp_ajax_dd_debug_order',        [ __CLASS__, 'ajax_debug_order' ] );
+        add_action( 'wp_ajax_dd_force_process',      [ __CLASS__, 'ajax_force_process' ] );
+        add_action( 'wp_ajax_dd_test_email',         [ __CLASS__, 'ajax_test_email' ] );
+        add_action( 'wp_ajax_dd_debug_cart',         [ __CLASS__, 'ajax_debug_cart' ] );
+        add_action( 'wp_ajax_nopriv_dd_debug_cart',  [ __CLASS__, 'ajax_debug_cart' ] );
     }
 
     public static function render_panel(): void {
@@ -222,5 +224,47 @@ class DD_Debug {
             $error = isset( $phpmailer ) ? $phpmailer->ErrorInfo : 'wp_mail() vrátilo false';
             wp_send_json_error( $error );
         }
+    }
+
+    /**
+     * Frontend debug endpoint – vrátí snapshot košíku (DD položky + session).
+     * Zabezpečeno stejným nonce jako ostatní DD frontend AJAX akce.
+     */
+    public static function ajax_debug_cart(): void {
+        check_ajax_referer( 'dd_cart_nonce', 'nonce' );
+
+        $cart_items = [];
+        foreach ( WC()->cart->get_cart() as $key => $item ) {
+            $product = $item['data'] ?? null;
+
+            $cart_items[ $key ] = [
+                'product_id'       => $item['product_id'] ?? null,
+                'dd_package_id'    => $item[ DD_Cart::CART_ITEM_KEY ] ?? null,
+                'dd_type'          => $item['dd_type'] ?? null,
+                'quantity'         => $item['quantity'] ?? null,
+                'line_total'       => $item['line_total'] ?? null,
+                'data_class'       => $product ? get_class( $product ) : 'null/false',
+                'data_exists'      => $product instanceof WC_Product ? $product->exists() : false,
+                'data_purchasable' => $product instanceof WC_Product ? $product->is_purchasable() : false,
+                'data_name'        => $product instanceof WC_Product ? $product->get_name() : null,
+                'data_price'       => $product instanceof WC_Product ? $product->get_price() : null,
+            ];
+        }
+
+        $session    = WC()->session;
+        $dd_session = [
+            'SESSION_KEY'   => $session ? $session->get( DD_Cart::SESSION_KEY ) : null,
+            'SESSION_XSELL' => $session ? $session->get( DD_Cart::SESSION_XSELL ) : null,
+        ];
+
+        $dd_items = array_filter( $cart_items, static fn( $i ) => $i['dd_package_id'] !== null );
+
+        wp_send_json_success( [
+            'cart_item_count' => count( $cart_items ),
+            'dd_items_count'  => count( $dd_items ),
+            'cart_items'      => $cart_items,
+            'dd_items'        => $dd_items,
+            'session_dd'      => $dd_session,
+        ] );
     }
 }

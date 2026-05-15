@@ -105,8 +105,8 @@
                         <tr>
                             <th><label for="dd-doc-file"><?php _e( 'Soubor', 'virtualni-balicek' ); ?></label></th>
                             <td>
-                                <input type="file" id="dd-doc-file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.zip,.epub,.txt,.docx">
-                                <span class="description"><?php _e( 'Max 20 MB. PDF, obrázky, ZIP, EPUB, DOCX, TXT', 'virtualni-balicek' ); ?></span>
+                                <input type="file" id="dd-doc-file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.zip,.epub,.txt,.docx" multiple>
+                                <span class="description"><?php _e( 'Max 20 MB na soubor. PDF, obrázky, ZIP, EPUB, DOCX, TXT. Lze vybrat více souborů najednou.', 'virtualni-balicek' ); ?></span>
                             </td>
                         </tr>
                     </table>

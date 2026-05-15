@@ -69,6 +69,173 @@ class DD_Installer {
         self::create_upload_dir();
     }
 
+    /**
+     * Returns the ID of a hidden, virtual WooCommerce product that serves as
+     * a placeholder for DD cart items. Creates it on first call.
+     *
+     * A real product_id is required so that the WooCommerce Store API (used by
+     * the block cart) does not discard the item.
+     */
+    public static function get_or_create_placeholder_product(): int {
+        $stored = (int) get_option( 'dd_placeholder_product_id', 0 );
+        if ( $stored > 0 && self::is_placeholder_product( $stored ) ) {
+            self::ensure_placeholder_product_config( $stored );
+            return $stored;
+        }
+
+        // Recover from situations where the option was lost.
+        if ( function_exists( 'wc_get_product_id_by_sku' ) ) {
+            $by_sku = wc_get_product_id_by_sku( 'dd-bundle-placeholder' );
+            if ( $by_sku > 0 ) {
+                update_option( 'dd_placeholder_product_id', $by_sku );
+                self::ensure_placeholder_product_config( $by_sku );
+                return $by_sku;
+            }
+        }
+
+        if ( ! class_exists( 'WC_Product_Simple' ) ) {
+            return 0;
+        }
+
+        $product = new WC_Product_Simple();
+        $product->set_name( __( 'Virtuální balíček', 'virtualni-balicek' ) );
+        $product->set_virtual( true );
+        $product->set_catalog_visibility( 'hidden' );
+        $product->set_status( 'publish' );
+        $product->set_price( '0' );
+        $product->set_regular_price( '0' );
+        // DD packages need separate cart rows (direct + cross-sell), so the
+        // placeholder must not be sold individually; otherwise additional DD
+        // additions can be blocked by WooCommerce.
+        $product->set_sold_individually( false );
+        $product->set_manage_stock( false );
+        $product->set_stock_status( 'instock' );
+        $product->set_sku( 'dd-bundle-placeholder' );
+
+        $product_id = $product->save();
+        if ( $product_id > 0 ) {
+            update_option( 'dd_placeholder_product_id', $product_id );
+            self::set_placeholder_thumbnail( $product_id );
+            return $product_id;
+        }
+
+        return 0;
+    }
+
+    private static function is_placeholder_product( int $product_id ): bool {
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            return false;
+        }
+        return (string) $product->get_sku() === 'dd-bundle-placeholder';
+    }
+
+    private static function ensure_placeholder_product_config( int $product_id ): void {
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            return;
+        }
+
+        $changed = false;
+        if ( ! $product->is_virtual() ) {
+            $product->set_virtual( true );
+            $changed = true;
+        }
+        if ( $product->get_catalog_visibility() !== 'hidden' ) {
+            $product->set_catalog_visibility( 'hidden' );
+            $changed = true;
+        }
+        if ( $product->get_status() !== 'publish' ) {
+            $product->set_status( 'publish' );
+            $changed = true;
+        }
+        if ( (string) $product->get_price() !== '0' ) {
+            $product->set_price( '0' );
+            $changed = true;
+        }
+        if ( (string) $product->get_regular_price() !== '0' ) {
+            $product->set_regular_price( '0' );
+            $changed = true;
+        }
+        if ( $product->get_sold_individually() ) {
+            $product->set_sold_individually( false );
+            $changed = true;
+        }
+        if ( $product->managing_stock() ) {
+            $product->set_manage_stock( false );
+            $changed = true;
+        }
+        if ( $product->get_stock_status() !== 'instock' ) {
+            $product->set_stock_status( 'instock' );
+            $changed = true;
+        }
+
+        if ( $changed ) {
+            $product->save();
+        }
+
+        self::set_placeholder_thumbnail( $product_id );
+    }
+
+    /**
+     * Uploads the plugin's package-icon.svg to the WP media library (once) and
+     * sets it as the thumbnail of the placeholder product.
+     */
+    private static function set_placeholder_thumbnail( int $product_id ): void {
+        // Already assigned?
+        if ( get_post_thumbnail_id( $product_id ) ) {
+            return;
+        }
+
+        // Check whether the icon was already uploaded in a previous run.
+        $existing = get_option( 'dd_placeholder_thumbnail_id', 0 );
+        if ( $existing > 0 && get_post( $existing ) ) {
+            set_post_thumbnail( $product_id, $existing );
+            return;
+        }
+
+        $icon_path = DD_PLUGIN_DIR . 'assets/package-icon.svg';
+        if ( ! file_exists( $icon_path ) ) {
+            return;
+        }
+
+        // Need WP media helpers.
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+
+        $upload       = wp_upload_dir();
+        $icon_subdir  = 'virtualni-balicek';
+        $dest_dir     = $upload['basedir'] . '/' . $icon_subdir;
+        $dest_file    = $dest_dir . '/package-icon.svg';
+
+        if ( ! is_dir( $dest_dir ) ) {
+            wp_mkdir_p( $dest_dir );
+        }
+
+        if ( ! copy( $icon_path, $dest_file ) ) {
+            return;
+        }
+
+        $wp_filetype  = wp_check_filetype( 'package-icon.svg', [ 'svg' => 'image/svg+xml' ] );
+        $attachment   = [
+            'guid'           => $upload['baseurl'] . '/' . $icon_subdir . '/package-icon.svg',
+            'post_mime_type' => $wp_filetype['type'] ?: 'image/svg+xml',
+            'post_title'     => __( 'Virtuální balíček – ikona', 'virtualni-balicek' ),
+            'post_content'   => '',
+            'post_status'    => 'inherit',
+        ];
+        $attach_id = wp_insert_attachment( $attachment, $dest_file, $product_id );
+        if ( ! $attach_id || is_wp_error( $attach_id ) ) {
+            return;
+        }
+
+        $attach_data = wp_generate_attachment_metadata( $attach_id, $dest_file );
+        wp_update_attachment_metadata( $attach_id, $attach_data );
+        set_post_thumbnail( $product_id, $attach_id );
+        update_option( 'dd_placeholder_thumbnail_id', $attach_id );
+    }
+
     public static function deactivate(): void {}
 
     public static function create_upload_dir(): void {
