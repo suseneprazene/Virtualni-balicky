@@ -9,6 +9,7 @@
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
     var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart-items', '.wc-block-cart'];
     var giftRowDebounceMs = 60;
+    var blockCartRefreshDebounceMs = 350;
     var giftRowObserver = null;
     var giftRowTimer = null;
     var blockCartSubscribed = false;
@@ -68,11 +69,13 @@
         if (!window.wp || !window.wp.data) return;
         var prevItemKeys = null;
         window.wp.data.subscribe(function () {
-            var store = window.wp.data.select && window.wp.data.select('wc/store/cart');
-            if (!store) return;
+            // Guard: only act when the cart store is available.
+            if (!window.wp.data.select) return;
+            var store = window.wp.data.select('wc/store/cart');
+            if (!store || typeof store.getCartData !== 'function') return;
             var items;
             try {
-                var data = store.getCartData ? store.getCartData() : null;
+                var data = store.getCartData();
                 items = data && data.items ? data.items : null;
             } catch (e) { return; }
             if (!items) return;
@@ -84,7 +87,7 @@
             if (keys !== prevItemKeys) {
                 prevItemKeys = keys;
                 if (blockCartRefreshTimer) clearTimeout(blockCartRefreshTimer);
-                blockCartRefreshTimer = setTimeout(refreshDDSection, 350);
+                blockCartRefreshTimer = setTimeout(refreshDDSection, blockCartRefreshDebounceMs);
             }
         });
     }
@@ -119,7 +122,10 @@
                     init();
                 }
             })
-            .catch(function () { ddRefreshing = false; });
+            .catch(function () {
+                ddRefreshing = false;
+                console.warn('DD: failed to refresh gift section after cart update.');
+            });
     }
 
     function markGiftRows() {
