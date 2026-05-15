@@ -3,6 +3,7 @@
     'use strict';
 
     var selectionInProgress = false;
+    var selectionTimeoutMs = 12000;
     var packageIconFilename = 'package-icon.svg';
     var packageLabelNeedle = ((DD_Cart && DD_Cart.package_label_needle) || '').toLowerCase();
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
@@ -111,15 +112,18 @@
         if (selectionInProgress) return;
         selectionInProgress = true;
 
-        $.post(DD_Cart.ajax_url, {
-            action:     'dd_select_package',
-            nonce:      DD_Cart.nonce,
-            package_id: packageId,
-            type:       type,
-            checked:    checked,
-        }, function (res) {
-            selectionInProgress = false;
-
+        $.ajax({
+            url: DD_Cart.ajax_url,
+            method: 'POST',
+            timeout: selectionTimeoutMs,
+            data: {
+                action:     'dd_select_package',
+                nonce:      DD_Cart.nonce,
+                package_id: packageId,
+                type:       type,
+                checked:    checked
+            }
+        }).done(function (res) {
             if (!res || !res.success) {
                 console.error('DD select failed:', {
                     endpoint: DD_Cart.ajax_url + '?action=dd_select_package',
@@ -154,7 +158,18 @@
                 // Classic shortcode cart: reload the cart table and totals in-place.
                 reloadCartSections();
             }
-        }).fail(function () {
+        }).fail(function (xhr, textStatus, errorThrown) {
+            console.error('DD select transport failed:', {
+                endpoint: DD_Cart.ajax_url + '?action=dd_select_package',
+                packageId: packageId,
+                type: type,
+                checked: checked,
+                textStatus: textStatus,
+                error: errorThrown || null,
+                httpStatus: xhr && typeof xhr.status !== 'undefined' ? xhr.status : null,
+                responseText: xhr && typeof xhr.responseText === 'string' ? xhr.responseText : null
+            });
+        }).always(function () {
             selectionInProgress = false;
         });
     }
