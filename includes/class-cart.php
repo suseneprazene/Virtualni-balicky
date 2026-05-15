@@ -155,6 +155,19 @@ class DD_Cart {
         return (int) $pid;
     }
 
+    /**
+     * Vrátí pole textových WooCommerce chybových oznámení (HTML stripped).
+     * Používá se pro diagnostický výstup v AJAX error response.
+     *
+     * @return string[]
+     */
+    private static function get_wc_error_notice_texts(): array {
+        return array_values( array_map(
+            static fn( array $n ): string => wp_strip_all_tags( $n['notice'] ?? '' ),
+            wc_get_notices( 'error' )
+        ) );
+    }
+
     public static function get_dd_cart_items(): array {
         if ( ! WC()->cart ) return [];
         $items = [];
@@ -260,7 +273,7 @@ class DD_Cart {
             ]
         );
         if ( ! $cart_key ) {
-            $wc_errors = array_column( wc_get_notices( 'error' ), 'notice' );
+            $wc_errors = self::get_wc_error_notice_texts();
             error_log( '[DD_Cart] add_package_to_cart: WC add_to_cart returned false for prod_id=' . $prod_id . ' pkg_id=' . $pkg_id . '. WC notices: ' . wp_json_encode( $wc_errors ) );
             return null;
         }
@@ -856,13 +869,9 @@ class DD_Cart {
             wc_clear_notices();
             $cart_key = self::add_package_to_cart( $package_id, $type );
             if ( ! $cart_key ) {
-                $wc_errors = array_values( array_map(
-                    static fn( array $n ): string => wp_strip_all_tags( $n['notice'] ?? '' ),
-                    wc_get_notices( 'error' )
-                ) );
                 wp_send_json_error( [
                     'message'    => __( 'Balíček se nepodařilo přidat do košíku.', 'virtualni-balicek' ),
-                    'wc_notices' => $wc_errors,
+                    'wc_notices' => self::get_wc_error_notice_texts(),
                 ] );
             }
         } else {
