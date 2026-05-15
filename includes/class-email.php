@@ -71,17 +71,20 @@ class DD_Email {
             $nameMap[ $gift_document->file_path ] = $filename;
         }
 
-        $renameCallback = static function ( $phpmailer ) use ( $nameMap ): void {
-            if ( empty( $nameMap ) || ! is_array( $phpmailer->attachment ?? null ) || $phpmailer->attachment === [] ) {
+        $renameCallback = static function ( $phpmailer ) use ( $attachments, $nameMap ): void {
+            if ( empty( $nameMap ) ) {
                 return;
             }
 
-            foreach ( $phpmailer->attachment as $i => $att ) {
-                $path = $att[0] ?? '';
-                if ( $path !== '' && isset( $nameMap[ $path ] ) ) {
-                    if ( ( $att[2] ?? '' ) !== $nameMap[ $path ] ) {
-                        $phpmailer->attachment[ $i ][2] = $nameMap[ $path ];
-                    }
+            // $phpmailer->attachment je protected – nelze přímo modifikovat.
+            // Správný postup: smazat přílohy a přidat je znovu se správným názvem.
+            $phpmailer->clearAttachments();
+            foreach ( $attachments as $path ) {
+                $name = $nameMap[ $path ] ?? '';
+                try {
+                    $phpmailer->addAttachment( $path, $name );
+                } catch ( \Exception $e ) {
+                    // Soubor nelze přiložit; přeskočit.
                 }
             }
         };
