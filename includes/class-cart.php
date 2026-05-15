@@ -942,10 +942,9 @@ class DD_Cart {
         .dd-gift-intro{margin:0 0 .5em;font-weight:600;}
         .dd-gift-crosssell{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.6em;}
         .dd-gift-crosssell .dd-gift-label{color:#555;font-weight:normal;}
-        /* When the container is locked (direct package chosen), crosssell row stays active */
-        .dd-gift-locked .dd-gift-crosssell .dd-gift-label{opacity:1;cursor:pointer;}
-        /* Only grey out crosssell when its own slot is locked */
-        .dd-gift-crosssell-locked .dd-gift-label{opacity:.6 !important;cursor:not-allowed !important;}
+        /* When the container is locked (direct package chosen), crosssell row stays active
+           unless the crosssell slot itself is also locked (dd-gift-crosssell-locked). */
+        .dd-gift-locked .dd-gift-crosssell:not(.dd-gift-crosssell-locked) .dd-gift-label{opacity:1;cursor:pointer;}
         .dd-gift-exhausted{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.4em;}
         .dd-gift-exhausted-msg{margin:0;color:#777;font-style:italic;}
         .dd-price-firstfree{color:#2ecc71;font-weight:700;}
