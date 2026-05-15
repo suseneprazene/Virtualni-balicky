@@ -485,11 +485,17 @@ class DD_Cart {
         }
 
         if ( WC()->session ) {
-            WC()->session->set( self::SESSION_KEY, $selected_id );
-            WC()->session->set( self::SESSION_XSELL, $xsell_id );
+            // Only persist to session what is actually in the cart.
+            // This clears any stale session value left from a previous failed/removed add,
+            // which would otherwise lock the UI indefinitely.
+            WC()->session->set( self::SESSION_KEY,   $selected['selected']  > 0 ? $selected_id : 0 );
+            WC()->session->set( self::SESSION_XSELL, $selected['crosssell'] > 0 ? $xsell_id   : 0 );
         }
 
-        $selection_locked = $selected_id > 0 || $xsell_id > 0;
+        // The lock must reflect the actual cart state, not a session-augmented value.
+        // Using $selected (from selected_ids_from_cart) ensures the lock is lifted as
+        // soon as the cart no longer contains a DD item.
+        $selection_locked = $selected['selected'] > 0 || $selected['crosssell'] > 0;
         $has_exact_match  = self::has_direct_match( $resolved['matched'] );
         $fallback_mode    = self::is_fallback_mode( $has_exact_match, $available, $crosssell_pkgs );
         $fallback_categories = self::available_fallback_categories( array_merge( $available, $crosssell_pkgs ) );
