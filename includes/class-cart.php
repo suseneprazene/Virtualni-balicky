@@ -491,16 +491,16 @@ class DD_Cart {
             WC()->session->set( self::SESSION_XSELL, $xsell_id );
         }
 
-        // The lock must reflect the actual cart state, not a session-augmented value.
-        // Using $selected (from selected_ids_from_cart) ensures the lock is lifted as
-        // soon as the cart no longer contains a DD item.
-        $selection_locked = $selected['selected'] > 0 || $selected['crosssell'] > 0;
+        // Lock state is tracked per slot so that adding a direct package does NOT
+        // prevent the user from also choosing a cross-sell package (and vice versa).
+        $direct_locked = $selected['selected'] > 0;
+        $xsell_locked  = $selected['crosssell'] > 0;
         $has_exact_match  = self::has_direct_match( $resolved['matched'] );
         $fallback_mode    = self::is_fallback_mode( $has_exact_match, $available, $crosssell_pkgs );
         $fallback_categories = self::available_fallback_categories( array_merge( $available, $crosssell_pkgs ) );
 
         ob_start();
-        echo '<div class="dd-gift-section' . ( $selection_locked ? ' dd-gift-locked' : '' ) . '" id="dd-gift-section">';
+        echo '<div class="dd-gift-section' . ( $direct_locked ? ' dd-gift-locked' : '' ) . '" id="dd-gift-section">';
         echo '<h3 class="dd-gift-heading">🎁 ' . esc_html__( 'Náhodný balíček', 'virtualni-balicek' )
             . ' <button type="button" class="dd-info-btn" aria-label="' . esc_attr__( 'Co je náhodný balíček?', 'virtualni-balicek' ) . '">?</button></h3>';
 
@@ -538,7 +538,7 @@ class DD_Cart {
             echo '</div>';
         }
 
-        if ( $selection_locked ) {
+        if ( $direct_locked ) {
             echo '<p class="dd-gift-lock-msg">' . esc_html__(
                 'Balíček je už v košíku. Pro změnu výběru nejdřív odeber balíček z košíku.',
                 'virtualni-balicek'
@@ -547,12 +547,12 @@ class DD_Cart {
 
         // Přímé balíčky – každý jako samostatný checkbox, vzájemně se vylučující
         if ( ! empty( $available ) ) {
-            self::render_direct_packages( $available, $selected_id, $email, $product_ids, $selection_locked );
+            self::render_direct_packages( $available, $selected_id, $email, $product_ids, $direct_locked );
         }
 
         // Cross-sell
         foreach ( $crosssell_pkgs as $pkg ) {
-            self::render_crosssell_checkbox( $pkg, $xsell_id === (int) $pkg->id, $selection_locked );
+            self::render_crosssell_checkbox( $pkg, $xsell_id === (int) $pkg->id, $xsell_locked );
         }
 
         // Vyčerpané
@@ -839,7 +839,7 @@ class DD_Cart {
         $template = get_option( 'dd_crosssell_label', 'Zajímá tě také náhodný balíček ze sekce {package_name}?' );
         $label    = str_replace( '{package_name}', $pkg->name, $template );
         ?>
-        <div class="dd-gift-row dd-gift-crosssell">
+        <div class="dd-gift-row dd-gift-crosssell<?php echo $selection_locked ? ' dd-gift-crosssell-locked' : ''; ?>">
             <label class="dd-gift-label">
                 <input type="checkbox"
                        class="dd-pkg-checkbox"
@@ -942,6 +942,10 @@ class DD_Cart {
         .dd-gift-intro{margin:0 0 .5em;font-weight:600;}
         .dd-gift-crosssell{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.6em;}
         .dd-gift-crosssell .dd-gift-label{color:#555;font-weight:normal;}
+        /* When the container is locked (direct package chosen), crosssell row stays active */
+        .dd-gift-locked .dd-gift-crosssell .dd-gift-label{opacity:1;cursor:pointer;}
+        /* Only grey out crosssell when its own slot is locked */
+        .dd-gift-crosssell-locked .dd-gift-label{opacity:.6 !important;cursor:not-allowed !important;}
         .dd-gift-exhausted{border-top:1px dashed #ccc;padding-top:.6em;margin-top:.4em;}
         .dd-gift-exhausted-msg{margin:0;color:#777;font-style:italic;}
         .dd-price-firstfree{color:#2ecc71;font-weight:700;}
