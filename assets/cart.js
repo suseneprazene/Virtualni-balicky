@@ -11,10 +11,27 @@
     var giftRowDebounceMs = 60;
     var giftRowObserver = null;
     var giftRowTimer = null;
+    var blockCartSubscribed = false;
+    var ddRefreshing = false;
+    var blockCartRefreshTimer = null;
 
     function init() {
         markGiftRows();
         setupGiftRowObserver();
+
+        // Subscribe to WC Blocks data store once so we can refresh the DD section
+        // when items are added or removed via the block cart.
+        if (DD_Cart.is_block_cart === '1' && !blockCartSubscribed) {
+            blockCartSubscribed = true;
+            subscribeBlockCartChanges();
+        }
+
+        // Classic cart: re-mark gift rows after WC replaces fragments.
+        $(document.body).off('wc_fragments_refreshed.dd wc_fragments_loaded.dd wc_cart_emptied.dd')
+            .on('wc_fragments_refreshed.dd wc_fragments_loaded.dd wc_cart_emptied.dd', function () {
+                markGiftRows();
+                setupGiftRowObserver();
+            });
 
         // Přímé balíčky – vzájemné vylučování: zaškrtnutím jednoho se ostatní odškrtnou
         $(document).off('change.dd', '.dd-pkg-checkbox').on('change.dd', '.dd-pkg-checkbox', function () {
@@ -40,6 +57,69 @@
         $(document).off('change.dd', '.dd-pkg-radio').on('change.dd', '.dd-pkg-radio', function () {
             sendSelection($(this).val(), $(this).data('type') || 'direct', 1);
         });
+    }
+
+    /**
+     * Subscribes to the WooCommerce Blocks data store and refreshes the DD gift
+     * section whenever the cart items change (e.g. user removes the DD item via
+     * the block cart "×" button).
+     */
+    function subscribeBlockCartChanges() {
+        if (!window.wp || !window.wp.data) return;
+        var prevItemKeys = null;
+        window.wp.data.subscribe(function () {
+            var store = window.wp.data.select && window.wp.data.select('wc/store/cart');
+            if (!store) return;
+            var items;
+            try {
+                var data = store.getCartData ? store.getCartData() : null;
+                items = data && data.items ? data.items : null;
+            } catch (e) { return; }
+            if (!items) return;
+            var keys = items.map(function (i) { return i.key || i.id || ''; }).sort().join(',');
+            if (prevItemKeys === null) {
+                prevItemKeys = keys;
+                return;
+            }
+            if (keys !== prevItemKeys) {
+                prevItemKeys = keys;
+                if (blockCartRefreshTimer) clearTimeout(blockCartRefreshTimer);
+                blockCartRefreshTimer = setTimeout(refreshDDSection, 350);
+            }
+        });
+    }
+
+    /**
+     * Fetches fresh DD gift section HTML via AJAX and replaces the current
+     * #dd-gift-section element.  Used after the block cart updates.
+     */
+    function refreshDDSection() {
+        if (ddRefreshing) return;
+        var existing = document.getElementById('dd-gift-section');
+        if (!existing) return;
+        ddRefreshing = true;
+        var url = DD_Cart.ajax_url + '?action=dd_get_cart_html&nonce=' + encodeURIComponent(DD_Cart.nonce);
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                ddRefreshing = false;
+                if (!data.success) return;
+                var html = (data.data && data.data.html) ? data.data.html : '';
+                var el = document.getElementById('dd-gift-section');
+                if (!el) return;
+                if (!html) {
+                    el.remove();
+                    return;
+                }
+                var tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                var newSection = tmp.querySelector('#dd-gift-section');
+                if (newSection) {
+                    el.replaceWith(newSection);
+                    init();
+                }
+            })
+            .catch(function () { ddRefreshing = false; });
     }
 
     function markGiftRows() {

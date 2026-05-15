@@ -138,6 +138,11 @@ class DD_Cart {
         $placeholder_id = self::get_placeholder_product_id();
         if ( $placeholder_id > 0 ) {
             $product->set_id( $placeholder_id );
+            // Copy the featured image so WC Blocks / Store API renders the correct thumbnail.
+            $image_id = (int) get_post_thumbnail_id( $placeholder_id );
+            if ( $image_id > 0 ) {
+                $product->set_image_id( $image_id );
+            }
         }
 
         return $product;
