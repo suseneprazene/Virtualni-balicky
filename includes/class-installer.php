@@ -78,8 +78,8 @@ class DD_Installer {
      */
     public static function get_or_create_placeholder_product(): int {
         $stored = (int) get_option( 'dd_placeholder_product_id', 0 );
-        if ( $stored > 0 && wc_get_product( $stored ) ) {
-            self::set_placeholder_thumbnail( $stored );
+        if ( $stored > 0 && self::is_placeholder_product( $stored ) ) {
+            self::ensure_placeholder_product_config( $stored );
             return $stored;
         }
 
@@ -88,7 +88,7 @@ class DD_Installer {
             $by_sku = wc_get_product_id_by_sku( 'dd-bundle-placeholder' );
             if ( $by_sku > 0 ) {
                 update_option( 'dd_placeholder_product_id', $by_sku );
-                self::set_placeholder_thumbnail( $by_sku );
+                self::ensure_placeholder_product_config( $by_sku );
                 return $by_sku;
             }
         }
@@ -104,7 +104,9 @@ class DD_Installer {
         $product->set_status( 'publish' );
         $product->set_price( '0' );
         $product->set_regular_price( '0' );
-        $product->set_sold_individually( true );
+        $product->set_sold_individually( false );
+        $product->set_manage_stock( false );
+        $product->set_stock_status( 'instock' );
         $product->set_sku( 'dd-bundle-placeholder' );
 
         $product_id = $product->save();
@@ -115,6 +117,61 @@ class DD_Installer {
         }
 
         return 0;
+    }
+
+    private static function is_placeholder_product( int $product_id ): bool {
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            return false;
+        }
+        return (string) $product->get_sku() === 'dd-bundle-placeholder';
+    }
+
+    private static function ensure_placeholder_product_config( int $product_id ): void {
+        $product = wc_get_product( $product_id );
+        if ( ! $product ) {
+            return;
+        }
+
+        $changed = false;
+        if ( ! $product->is_virtual() ) {
+            $product->set_virtual( true );
+            $changed = true;
+        }
+        if ( $product->get_catalog_visibility() !== 'hidden' ) {
+            $product->set_catalog_visibility( 'hidden' );
+            $changed = true;
+        }
+        if ( $product->get_status() !== 'publish' ) {
+            $product->set_status( 'publish' );
+            $changed = true;
+        }
+        if ( (string) $product->get_price() !== '0' ) {
+            $product->set_price( '0' );
+            $changed = true;
+        }
+        if ( (string) $product->get_regular_price() !== '0' ) {
+            $product->set_regular_price( '0' );
+            $changed = true;
+        }
+        if ( $product->get_sold_individually() ) {
+            $product->set_sold_individually( false );
+            $changed = true;
+        }
+        if ( $product->managing_stock() ) {
+            $product->set_manage_stock( false );
+            $changed = true;
+        }
+        if ( $product->get_stock_status() !== 'instock' ) {
+            $product->set_stock_status( 'instock' );
+            $changed = true;
+        }
+
+        if ( $changed ) {
+            $product->save();
+        }
+
+        self::set_placeholder_thumbnail( $product_id );
     }
 
     /**
