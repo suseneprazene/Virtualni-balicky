@@ -472,15 +472,10 @@ class DD_Cart {
 
         $available_ids = array_map( 'intval', wp_list_pluck( $available, 'id' ) );
         $crosssell_ids = array_map( 'intval', wp_list_pluck( $crosssell_pkgs, 'id' ) );
-        $session_selected  = WC()->session ? (int) WC()->session->get( self::SESSION_KEY, 0 ) : 0;
-        $session_crosssell = WC()->session ? (int) WC()->session->get( self::SESSION_XSELL, 0 ) : 0;
 
-        if ( ! $selected_id && $session_selected > 0 && in_array( $session_selected, $available_ids, true ) ) {
-            $selected_id = $session_selected;
-        }
-        if ( ! $xsell_id && $session_crosssell > 0 && in_array( $session_crosssell, $crosssell_ids, true ) ) {
-            $xsell_id = $session_crosssell;
-        }
+        // Checked state is authoritative from the cart only – do not fall back to
+        // session here.  Reading session would cause a checkbox to appear checked
+        // when the item is not in the cart (stale session from a previous visit).
 
         if ( $selected_id > 0 && ! in_array( $selected_id, $available_ids, true ) ) {
             $selected_id = 0;
@@ -490,11 +485,10 @@ class DD_Cart {
         }
 
         if ( WC()->session ) {
-            // Only persist to session what is actually in the cart.
-            // This clears any stale session value left from a previous failed/removed add,
-            // which would otherwise lock the UI indefinitely.
-            WC()->session->set( self::SESSION_KEY,   $selected['selected']  > 0 ? $selected_id : 0 );
-            WC()->session->set( self::SESSION_XSELL, $selected['crosssell'] > 0 ? $xsell_id   : 0 );
+            // Keep session in sync with the actual cart so the lock logic works
+            // correctly on every request.
+            WC()->session->set( self::SESSION_KEY,   $selected_id );
+            WC()->session->set( self::SESSION_XSELL, $xsell_id );
         }
 
         // The lock must reflect the actual cart state, not a session-augmented value.
@@ -996,7 +990,16 @@ class DD_Cart {
         .dd-cart-item .qty,
         .dd-cart-item .plus,
         .dd-cart-item .minus,
-        .dd-cart-item [class*="quantity"] button{
+        .dd-cart-item [class*="quantity"] button,
+        tr:has([data-dd-gift-item="1"]) .product-quantity,
+        tr:has([data-dd-gift-item="1"]) td.product-quantity,
+        tr:has([data-dd-gift-item="1"]) .quantity,
+        tr:has([data-dd-gift-item="1"]) .qty,
+        tr:has([data-dd-gift-item="1"]) .plus,
+        tr:has([data-dd-gift-item="1"]) .minus,
+        li:has([data-dd-gift-item="1"]) .wc-block-components-quantity-selector,
+        li:has([data-dd-gift-item="1"]) .wc-block-cart-item__quantity,
+        li:has([data-dd-gift-item="1"]) [class*="quantity"] button{
             display:none !important;
         }
         .dd-cart-item-label{display:inline-flex;align-items:center;gap:.35em;}
