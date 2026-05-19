@@ -61,30 +61,27 @@ class DD_Email {
                 continue;
             }
 
-            $attachments[] = $gift_document->file_path;
-            $ext           = strtolower( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_EXTENSION ) );
-            $baseFilename  = sanitize_file_name( (string) pathinfo( (string) $gift_document->name, PATHINFO_FILENAME ) );
-            $filename      = $baseFilename !== '' ? $baseFilename : sanitize_file_name( (string) $gift_document->name );
-            if ( $ext !== '' ) {
-                $filename .= '.' . $ext;
-            }
-            $nameMap[ $gift_document->file_path ] = $filename;
+$attachments[] = $gift_document->file_path;
+$ext           = strtolower( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_EXTENSION ) );
+$baseFilename  = sanitize_file_name( (string) pathinfo( (string) $gift_document->name, PATHINFO_FILENAME ) );
+$filename      = $baseFilename !== '' ? $baseFilename : sanitize_file_name( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_FILENAME ) );
+if ( $ext !== '' ) {
+    $filename .= '.' . $ext;
+}
+$nameMap[ $gift_document->file_path ] = $filename;
         }
 
-        $renameCallback = static function ( $phpmailer ) use ( $attachments, $nameMap ): void {
-            if ( empty( $nameMap ) ) {
+        $renameCallback = static function ( $phpmailer ) use ( $nameMap ): void {
+            if ( empty( $nameMap ) || ! is_array( $phpmailer->attachment ?? null ) || $phpmailer->attachment === [] ) {
                 return;
             }
 
-            // $phpmailer->attachment je protected – nelze přímo modifikovat.
-            // Správný postup: smazat přílohy a přidat je znovu se správným názvem.
-            $phpmailer->clearAttachments();
-            foreach ( $attachments as $path ) {
-                $name = $nameMap[ $path ] ?? '';
-                try {
-                    $phpmailer->addAttachment( $path, $name );
-                } catch ( \Exception $e ) {
-                    // Soubor nelze přiložit; přeskočit.
+            foreach ( $phpmailer->attachment as $i => $att ) {
+                $path = $att[0] ?? '';
+                if ( $path !== '' && isset( $nameMap[ $path ] ) ) {
+                    if ( ( $att[2] ?? '' ) !== $nameMap[ $path ] ) {
+                        $phpmailer->attachment[ $i ][2] = $nameMap[ $path ];
+                    }
                 }
             }
         };
