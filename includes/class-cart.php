@@ -160,6 +160,31 @@ class DD_Cart {
         return (int) $pid;
     }
 
+    private static function get_placeholder_thumbnail_id(): int {
+        $placeholder_id = self::get_placeholder_product_id();
+        if ( $placeholder_id <= 0 ) {
+            return 0;
+        }
+
+        return (int) get_post_thumbnail_id( $placeholder_id );
+    }
+
+    private static function get_placeholder_thumbnail_html( string $size, array $attr = [], bool $fallback_to_placeholder = false ): string {
+        $image_id = self::get_placeholder_thumbnail_id();
+        if ( $image_id > 0 ) {
+            $image_html = (string) wp_get_attachment_image( $image_id, $size, false, $attr );
+            if ( $image_html !== '' ) {
+                return $image_html;
+            }
+        }
+
+        if ( $fallback_to_placeholder ) {
+            return (string) wc_placeholder_img( $size, $attr );
+        }
+
+        return '';
+    }
+
     /**
      * Vrátí pole textových WooCommerce chybových oznámení (HTML stripped).
      * Používá se pro diagnostický výstup v AJAX error response.
@@ -395,9 +420,17 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
-        $icon = DD_PLUGIN_URL . 'assets/package-icon.svg';
+        $icon = self::get_placeholder_thumbnail_html(
+            'woocommerce_gallery_thumbnail',
+            [
+                'class'    => 'dd-cart-item-icon attachment-woocommerce_gallery_thumbnail size-woocommerce_gallery_thumbnail',
+                'alt'      => '',
+                'loading'  => 'lazy',
+                'decoding' => 'async',
+            ]
+        );
         return wp_kses_post(
-            '<span class="dd-cart-item-label" data-dd-gift-item="1"><img class="dd-cart-item-icon" src="' . esc_url( $icon ) . '" alt="" loading="lazy" decoding="async" /> ' . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
+            '<span class="dd-cart-item-label" data-dd-gift-item="1">' . $icon . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
         );
     }
 
@@ -438,8 +471,16 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
             return $thumbnail;
         }
-        $icon = DD_PLUGIN_URL . 'assets/package-icon.svg';
-        return '<img src="' . esc_url( $icon ) . '" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail" alt="" loading="lazy" decoding="async" />';
+        return self::get_placeholder_thumbnail_html(
+            'woocommerce_thumbnail',
+            [
+                'class'    => 'attachment-woocommerce_thumbnail size-woocommerce_thumbnail',
+                'alt'      => '',
+                'loading'  => 'lazy',
+                'decoding' => 'async',
+            ],
+            true
+        );
     }
 
     public static function cart_item_price( string $price_html, array $cart_item, string $cart_item_key ): string {
@@ -1039,7 +1080,7 @@ class DD_Cart {
             display:none !important;
         }
         .dd-cart-item-label{display:inline-flex;align-items:center;gap:.35em;}
-        .dd-cart-item-icon{width:1em;height:1em;display:inline-block;flex:0 0 1em;vertical-align:middle;}
+        .dd-cart-item-icon{width:1.5em;height:1.5em;display:inline-block;flex:0 0 1.5em;object-fit:cover;border-radius:2px;}
         ';
     }
 }
