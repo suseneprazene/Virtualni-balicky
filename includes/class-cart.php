@@ -160,6 +160,9 @@ class DD_Cart {
         return (int) $pid;
     }
 
+    /**
+     * Returns the featured image attachment ID of the placeholder product.
+     */
     private static function get_placeholder_thumbnail_id(): int {
         $placeholder_id = self::get_placeholder_product_id();
         if ( $placeholder_id <= 0 ) {
@@ -169,6 +172,10 @@ class DD_Cart {
         return (int) get_post_thumbnail_id( $placeholder_id );
     }
 
+    /**
+     * Returns placeholder product thumbnail HTML, optionally falling back to the
+     * standard WooCommerce placeholder output when no product image is set.
+     */
     private static function get_placeholder_thumbnail_html( string $size, array $attr = [], bool $fallback_to_placeholder = false ): string {
         $image_id = self::get_placeholder_thumbnail_id();
         if ( $image_id > 0 ) {
@@ -420,7 +427,7 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
-        $icon = self::get_placeholder_thumbnail_html(
+        $thumbnail_html = self::get_placeholder_thumbnail_html(
             'woocommerce_gallery_thumbnail',
             [
                 'class'    => 'dd-cart-item-icon attachment-woocommerce_gallery_thumbnail size-woocommerce_gallery_thumbnail',
@@ -430,7 +437,7 @@ class DD_Cart {
             ]
         );
         return wp_kses_post(
-            '<span class="dd-cart-item-label" data-dd-gift-item="1">' . $icon . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
+            '<span class="dd-cart-item-label" data-dd-gift-item="1">' . $thumbnail_html . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
         );
     }
 
