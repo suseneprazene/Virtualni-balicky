@@ -479,12 +479,13 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
             return $thumbnail;
         }
-        $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
+        $pkg           = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
+        $thumbnail_alt = $pkg ? self::virtual_item_label( $pkg ) : __( 'Virtuální balíček', 'virtualni-balicek' );
         return self::get_placeholder_thumbnail_html(
             'woocommerce_thumbnail',
             [
                 'class'    => 'attachment-woocommerce_thumbnail size-woocommerce_thumbnail',
-                'alt'      => $pkg ? self::virtual_item_label( $pkg ) : __( 'Virtuální balíček', 'virtualni-balicek' ),
+                'alt'      => $thumbnail_alt,
                 'loading'  => 'lazy',
                 'decoding' => 'async',
             ],
