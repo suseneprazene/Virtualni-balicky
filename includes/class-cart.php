@@ -427,17 +427,18 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
         $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         if ( ! $pkg ) return $name;
+        $label_text     = self::virtual_item_label( $pkg );
         $thumbnail_html = self::get_placeholder_thumbnail_html(
             'woocommerce_gallery_thumbnail',
             [
                 'class'    => 'dd-cart-item-icon attachment-woocommerce_gallery_thumbnail size-woocommerce_gallery_thumbnail',
-                'alt'      => '',
+                'alt'      => $label_text,
                 'loading'  => 'lazy',
                 'decoding' => 'async',
             ]
         );
         return wp_kses_post(
-            '<span class="dd-cart-item-label" data-dd-gift-item="1">' . $thumbnail_html . esc_html( self::virtual_item_label( $pkg ) ) . '</span>'
+            '<span class="dd-cart-item-label" data-dd-gift-item="1">' . $thumbnail_html . '<span class="dd-cart-item-text">' . esc_html( $label_text ) . '</span></span>'
         );
     }
 
@@ -478,11 +479,12 @@ class DD_Cart {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
             return $thumbnail;
         }
+        $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
         return self::get_placeholder_thumbnail_html(
             'woocommerce_thumbnail',
             [
                 'class'    => 'attachment-woocommerce_thumbnail size-woocommerce_thumbnail',
-                'alt'      => '',
+                'alt'      => $pkg ? self::virtual_item_label( $pkg ) : __( 'Virtuální balíček', 'virtualni-balicek' ),
                 'loading'  => 'lazy',
                 'decoding' => 'async',
             ],
