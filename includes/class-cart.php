@@ -1080,7 +1080,7 @@ class DD_Cart {
             display:none !important;
         }
         .dd-cart-item-label{display:inline-flex;align-items:center;gap:.35em;}
-        .dd-cart-item-icon{width:1.5em;height:1.5em;display:inline-block;flex:0 0 1.5em;object-fit:cover;border-radius:2px;}
+        .dd-cart-item-icon{width:1.5em;height:1.5em;flex:0 0 1.5em;object-fit:cover;border-radius:2px;}
         ';
     }
 }
