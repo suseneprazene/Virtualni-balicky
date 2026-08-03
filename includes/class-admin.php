@@ -21,6 +21,7 @@ class DD_Admin {
         add_action( 'wp_ajax_dd_clear_customer',    [ __CLASS__, 'ajax_clear_customer' ] );
         add_action( 'wp_ajax_dd_delete_sent_record', [ __CLASS__, 'ajax_delete_sent_record' ] );
         add_action( 'wp_ajax_dd_send_random_by_category', [ __CLASS__, 'ajax_send_random_by_category' ] );
+        add_action( 'wp_ajax_dd_send_package_direct',     [ __CLASS__, 'ajax_send_package_direct' ] );
     }
 
     public static function register_menu(): void {
@@ -578,6 +579,36 @@ class DD_Admin {
             'category'     => $category->name,
             'package_id'   => (int) $picked->id,
             'package_name' => $picked->name,
+            'customer_data' => self::build_customer_history_payload( $email ),
+        ] );
+    }
+
+    // ── AJAX: přímé odeslání konkrétního balíčku zákazníkovi ─────────────────
+
+    public static function ajax_send_package_direct(): void {
+        check_ajax_referer( 'dd_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'Nedostatečná oprávnění.', 'virtualni-balicek' ) );
+        }
+
+        $email      = sanitize_email( $_POST['email'] ?? '' );
+        $package_id = absint( $_POST['package_id'] ?? 0 );
+
+        if ( ! $email ) {
+            wp_send_json_error( __( 'Neplatný zákazník (e-mail).', 'virtualni-balicek' ) );
+        }
+        if ( ! $package_id ) {
+            wp_send_json_error( __( 'Neplatný balíček.', 'virtualni-balicek' ) );
+        }
+
+        $result = DD_Order::send_manual_random_package_for_customer( $email, $package_id );
+        if ( empty( $result['success'] ) ) {
+            wp_send_json_error( $result['message'] ?? __( 'Nepodařilo se odeslat balíček.', 'virtualni-balicek' ) );
+        }
+
+        wp_send_json_success( [
+            'message'       => $result['message'],
+            'package_id'    => $package_id,
             'customer_data' => self::build_customer_history_payload( $email ),
         ] );
     }

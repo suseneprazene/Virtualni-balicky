@@ -72,21 +72,25 @@
         });
         html += '</tbody></table>';
 
-        // Manuální odeslání náhodného balíčku podle kategorie
-        html += '<h3 style="margin-top:1.5em">Manuální odeslání podle kategorie</h3>';
-        if (!d.categories || !d.categories.length) {
-            html += '<p style="color:#999"><em>Žádné kategorie s balíčky.</em></p>';
+        // Manuální odeslání náhodného balíčku
+        html += '<h3 style="margin-top:1.5em">Manuální odeslání balíčku</h3>';
+        var sendablePackages = d.summary.filter(function(s) { return s.active; });
+        if (!sendablePackages.length) {
+            html += '<p style="color:#999"><em>Žádné aktivní balíčky.</em></p>';
         } else {
             html += '<table class="widefat striped" style="max-width:900px"><thead><tr>'
-                  + '<th>Kategorie</th><th>Balíčky v kategorii</th><th>K odeslání</th><th>Akce</th>'
+                  + '<th>Balíček</th><th>Celkem dok.</th><th>Zbývá k odeslání</th><th>Akce</th>'
                   + '</tr></thead><tbody>';
-            d.categories.forEach(function(c) {
-                var disabled = c.available_count > 0 ? '' : 'disabled';
+            sendablePackages.forEach(function(s) {
+                var disabled = s.remaining > 0 ? '' : 'disabled';
+                var remainText = s.remaining > 0
+                    ? s.remaining + ' / ' + s.total_docs
+                    : '<span style="color:#c00">vyčerpáno</span>';
                 html += '<tr>'
-                      + '<td>' + escHtml(c.name) + '</td>'
-                      + '<td>' + escHtml(String(c.eligible_count)) + '</td>'
-                      + '<td>' + escHtml(String(c.available_count)) + '</td>'
-                      + '<td><button class="button button-secondary dd-send-random-cat" data-category-id="' + escHtml(String(c.id)) + '" ' + disabled + '>Odešli náhodný balíček</button></td>'
+                      + '<td><strong>' + escHtml(s.package_name) + '</strong></td>'
+                      + '<td>' + s.total_docs + '</td>'
+                      + '<td>' + remainText + '</td>'
+                      + '<td><button class="button button-secondary dd-send-package-direct" data-package-id="' + escHtml(String(s.package_id)) + '" data-package-name="' + escHtml(s.package_name) + '" ' + disabled + '>Odešli náhodný dokument</button></td>'
                       + '</tr>';
             });
             html += '</tbody></table>';
@@ -194,24 +198,25 @@
         });
     });
 
-    // Ruční odeslání náhodného balíčku podle kategorie
-    $(document).on('click', '.dd-send-random-cat', function() {
+    // Ruční odeslání konkrétního balíčku zákazníkovi
+    $(document).on('click', '.dd-send-package-direct', function() {
         var btn = $(this);
         var email = $('#dd-customer-email').val().trim();
-        var categoryId = btn.data('category-id');
-        if (!email || !categoryId) return;
-        if (!confirm('Odeslat zákazníkovi ' + email + ' náhodný balíček z této kategorie?')) return;
+        var packageId = btn.data('package-id');
+        var packageName = btn.data('package-name');
+        if (!email || !packageId) return;
+        if (!confirm('Odeslat zákazníkovi ' + email + ' náhodný dokument z balíčku "' + packageName + '"?')) return;
 
         btn.prop('disabled', true).text('Odesílám…');
         $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
-            action: 'dd_send_random_by_category',
-            nonce:  nonce,
-            email:  email,
-            category_id: categoryId
+            action:     'dd_send_package_direct',
+            nonce:      nonce,
+            email:      email,
+            package_id: packageId
         }, function(res) {
             if (!res.success) {
                 alert('Chyba: ' + (res.data || 'neznámá'));
-                btn.prop('disabled', false).text('Odešli náhodný balíček');
+                btn.prop('disabled', false).text('Odešli náhodný dokument');
                 return;
             }
             var msg = (res.data && res.data.message) ? res.data.message : 'Balíček byl odeslán.';
@@ -224,7 +229,7 @@
             }
         }).fail(function() {
             alert('Chyba při komunikaci se serverem.');
-            btn.prop('disabled', false).text('Odešli náhodný balíček');
+            btn.prop('disabled', false).text('Odešli náhodný dokument');
         });
     });
 })(jQuery);
