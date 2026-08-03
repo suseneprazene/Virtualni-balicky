@@ -654,24 +654,12 @@ class DD_Admin {
         }
 
         $categories = [];
-        $terms      = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => false ] );
+        $terms      = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => false, 'orderby' => 'name' ] );
         if ( ! is_wp_error( $terms ) ) {
-            $category_rows = $wpdb->get_results(
-                "SELECT DISTINCT object_id FROM {$wpdb->prefix}dd_package_rules WHERE rule_type = 'category' ORDER BY object_id ASC"
-            );
-
-            $term_names = [];
             foreach ( $terms as $term ) {
-                $term_names[ (int) $term->term_id ] = (string) $term->name;
-            }
+                $category_id = (int) $term->term_id;
 
-            foreach ( $category_rows as $row ) {
-                $category_id = absint( $row->object_id ?? 0 );
-                if ( ! $category_id || empty( $term_names[ $category_id ] ) ) {
-                    continue;
-                }
-
-                $eligible_packages = DD_Package::get_active_by_category( $category_id, true );
+                $eligible_packages = DD_Package::get_active_by_category( $category_id, false );
                 if ( empty( $eligible_packages ) ) {
                     continue;
                 }
@@ -685,7 +673,7 @@ class DD_Admin {
 
                 $categories[] = [
                     'id'              => $category_id,
-                    'name'            => $term_names[ $category_id ],
+                    'name'            => $term->name,
                     'eligible_count'  => count( $eligible_packages ),
                     'available_count' => $available_count,
                 ];
