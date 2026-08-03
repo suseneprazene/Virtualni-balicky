@@ -18,6 +18,23 @@ class DD_Package {
         return $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}dd_packages WHERE active = 1 ORDER BY id DESC" ) ?: [];
     }
 
+    public static function get_active_by_category( int $category_id ): array {
+        $category_id = absint( $category_id );
+        if ( ! $category_id ) {
+            return [];
+        }
+
+        global $wpdb;
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT DISTINCT p.*
+             FROM {$wpdb->prefix}dd_packages p
+             INNER JOIN {$wpdb->prefix}dd_package_rules r ON r.package_id = p.id
+             WHERE p.active = 1 AND r.rule_type = 'category' AND r.object_id = %d
+             ORDER BY p.id DESC",
+            $category_id
+        ) ) ?: [];
+    }
+
     // ── Pravidla přiřazení ────────────────────────────────────────────────────
 
     public static function get_rules( int $package_id ): array {

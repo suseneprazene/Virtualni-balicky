@@ -351,10 +351,16 @@
 
     function appendDocRow(doc) {
         const icon = mimeIcon(doc.file_type);
+        const isPdf = String(doc.file_type || '').toLowerCase().includes('pdf');
+        const openBtn = (isPdf && doc.open_url)
+            ? `<a class="button dd-open-doc" href="${escAttr(doc.open_url)}" target="_blank" rel="noopener noreferrer">📄 Otevřít PDF</a>`
+            : '';
+
         $('#dd-document-list').append(`<div class="dd-doc-row" data-id="${doc.id}">
             <span class="dd-doc-icon">${icon}</span>
             <span class="dd-doc-name">${escHtml(doc.name)}</span>
             <span class="dd-doc-size">${doc.size || ''}</span>
+            ${openBtn}
             <button class="button button-link-delete dd-delete-doc" data-id="${doc.id}" title="Smazat">🗑</button>
         </div>`);
     }
@@ -378,6 +384,10 @@
         return String(str)
             .replace(/&/g,'&amp;').replace(/</g,'&lt;')
             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function escAttr(str) {
+        return escHtml(String(str)).replace(/'/g, '&#39;');
     }
 
     function showNotice(type, msg) {

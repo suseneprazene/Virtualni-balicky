@@ -68,6 +68,26 @@
             });
             html += '</tbody></table>';
 
+            // Manuální odeslání náhodného balíčku podle kategorie
+            html += '<h3 style="margin-top:1.5em">Manuální odeslání podle kategorie</h3>';
+            if (!d.categories || !d.categories.length) {
+                html += '<p style="color:#999"><em>Žádné kategorie s balíčky.</em></p>';
+            } else {
+                html += '<table class="widefat striped" style="max-width:900px"><thead><tr>'
+                      + '<th>Kategorie</th><th>Balíčky v kategorii</th><th>K odeslání</th><th>Akce</th>'
+                      + '</tr></thead><tbody>';
+                d.categories.forEach(function(c) {
+                    var disabled = c.available_count > 0 ? '' : 'disabled';
+                    html += '<tr>'
+                          + '<td>' + escHtml(c.name) + '</td>'
+                          + '<td>' + escHtml(String(c.eligible_count)) + '</td>'
+                          + '<td>' + escHtml(String(c.available_count)) + '</td>'
+                          + '<td><button class="button button-secondary dd-send-random-cat" data-category-id="' + escHtml(String(c.id)) + '" ' + disabled + '>Odešli náhodný balíček</button></td>'
+                          + '</tr>';
+                });
+                html += '</tbody></table>';
+            }
+
             // Historie odeslaných
             html += '<h3 style="margin-top:1.5em">Historie odeslaných dárků</h3>';
             if (!d.history.length) {
@@ -147,6 +167,36 @@
             $('#dd-customer-result').prepend(notice);
             // Znovu načti přehled
             search(email);
+        });
+    });
+
+    // Ruční odeslání náhodného balíčku podle kategorie
+    $(document).on('click', '.dd-send-random-cat', function() {
+        var btn = $(this);
+        var email = $('#dd-customer-email').val().trim();
+        var categoryId = btn.data('category-id');
+        if (!email || !categoryId) return;
+        if (!confirm('Odeslat zákazníkovi ' + email + ' náhodný balíček z této kategorie?')) return;
+
+        btn.prop('disabled', true).text('Odesílám…');
+        $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+            action: 'dd_send_random_by_category',
+            nonce:  nonce,
+            email:  email,
+            category_id: categoryId
+        }, function(res) {
+            if (!res.success) {
+                alert('Chyba: ' + (res.data || 'neznámá'));
+                btn.prop('disabled', false).text('Odešli náhodný balíček');
+                return;
+            }
+            var msg = (res.data && res.data.message) ? res.data.message : 'Balíček byl odeslán.';
+            var notice = $('<div class="notice notice-success is-dismissible"><p>✅ ' + escHtml(msg) + '</p></div>');
+            $('#dd-customer-result').prepend(notice);
+            search(email);
+        }).fail(function() {
+            alert('Chyba při komunikaci se serverem.');
+            btn.prop('disabled', false).text('Odešli náhodný balíček');
         });
     });
 })(jQuery);
