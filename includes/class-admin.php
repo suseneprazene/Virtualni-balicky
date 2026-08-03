@@ -379,11 +379,7 @@ class DD_Admin {
             'name'      => $d->name,
             'file_type' => $d->file_type,
             'size'      => file_exists( $d->file_path ) ? size_format( filesize( $d->file_path ) ) : '?',
-            'open_url'  => wp_nonce_url(
-                admin_url( 'admin-ajax.php?action=dd_download_document&doc_id=' . absint( $d->id ) . '&inline=1' ),
-                'dd_admin_nonce',
-                'nonce'
-            ),
+            'open_url'  => admin_url( 'admin-ajax.php?action=dd_download_document&doc_id=' . absint( $d->id ) . '&inline=1' ),
         ], $docs );
         wp_send_json_success( $out );
     }
@@ -474,88 +470,7 @@ class DD_Admin {
         $email = sanitize_email( $_POST['email'] ?? '' );
         if ( ! $email ) wp_send_json_error( 'Chybí e-mail.' );
 
-        global $wpdb;
-
-        // Všechny odeslané dárky pro zákazníka
-        $rows = $wpdb->get_results( $wpdb->prepare(
-            "SELECT
-                s.id,
-                s.package_id,
-                p.name  AS package_name,
-                s.document_id,
-                d.name  AS document_name,
-                d.file_type,
-                s.order_id,
-                s.sent_at
-             FROM {$wpdb->prefix}dd_sent s
-             LEFT JOIN {$wpdb->prefix}dd_packages  p ON p.id = s.package_id
-             LEFT JOIN {$wpdb->prefix}dd_documents d ON d.id = s.document_id
-             WHERE s.user_email = %s
-             ORDER BY s.sent_at DESC",
-            $email
-        ) );
-
-        // Přidej info kolik dokumentů zbývá v každém balíčku
-        $packages = DD_Package::get_all();
-        $summary  = [];
-        foreach ( $packages as $pkg ) {
-            $total      = DD_Package::document_count( (int) $pkg->id );
-            $sent_count = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}dd_sent WHERE package_id = %d AND user_email = %s",
-                $pkg->id, $email
-            ) );
-            $unsent = max( 0, $total - $sent_count );
-            $summary[] = [
-                'package_id'   => $pkg->id,
-                'package_name' => $pkg->name,
-                'active'       => (bool) $pkg->active,
-                'total_docs'   => $total,
-                'sent'         => $sent_count,
-                'remaining'    => $unsent,
-            ];
-        }
-
-        $categories = [];
-        $terms      = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => false ] );
-        if ( ! is_wp_error( $terms ) ) {
-            $term_names = [];
-            foreach ( $terms as $term ) {
-                $term_names[ (int) $term->term_id ] = $term->name;
-            }
-
-            $category_rows = $wpdb->get_results(
-                "SELECT DISTINCT object_id FROM {$wpdb->prefix}dd_package_rules WHERE rule_type = 'category'"
-            );
-
-            foreach ( $category_rows as $row ) {
-                $category_id = absint( $row->object_id ?? 0 );
-                if ( ! $category_id || empty( $term_names[ $category_id ] ) ) {
-                    continue;
-                }
-
-                $eligible_packages = DD_Package::get_active_by_category( $category_id );
-                $available_count   = 0;
-                foreach ( $eligible_packages as $pkg ) {
-                    if ( DD_Package::has_unsent( (int) $pkg->id, $email ) ) {
-                        $available_count++;
-                    }
-                }
-
-                $categories[] = [
-                    'id'              => $category_id,
-                    'name'            => $term_names[ $category_id ],
-                    'eligible_count'  => count( $eligible_packages ),
-                    'available_count' => $available_count,
-                ];
-            }
-        }
-
-        wp_send_json_success( [
-            'email'   => $email,
-            'history' => $rows,
-            'summary' => $summary,
-            'categories' => $categories,
-        ] );
+        wp_send_json_success( self::build_customer_history_payload( $email ) );
     }
 
     // ── AJAX: smazání historie zákazníka (pro testování) ──────────────────────
@@ -636,14 +551,19 @@ class DD_Admin {
             'category'     => $category->name,
             'package_id'   => (int) $picked->id,
             'package_name' => $picked->name,
+            'customer_data' => self::build_customer_history_payload( $email ),
         ] );
     }
 
     // ── AJAX: stažení dokumentu (admin – proklik z objednávky) ────────────────
 
     public static function ajax_download_document(): void {
-        check_ajax_referer( 'dd_admin_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_woocommerce' ) ) wp_die( 'Nedostatečná oprávnění.', 403 );
+
+        $nonce = sanitize_text_field( wp_unslash( $_REQUEST['nonce'] ?? '' ) );
+        if ( $nonce && ! wp_verify_nonce( $nonce, 'dd_admin_nonce' ) ) {
+            wp_die( 'Neplatný bezpečnostní token.', 403 );
+        }
 
         $doc_id = absint( $_GET['doc_id'] ?? 0 );
         if ( ! $doc_id ) wp_die( 'Chybí ID dokumentu.' );
@@ -663,5 +583,93 @@ class DD_Admin {
         header( 'Cache-Control: no-cache' );
         readfile( $doc->file_path );
         exit;
+    }
+
+    private static function build_customer_history_payload( string $email ): array {
+        global $wpdb;
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT
+                s.id,
+                s.package_id,
+                p.name  AS package_name,
+                s.document_id,
+                d.name  AS document_name,
+                d.file_type,
+                s.order_id,
+                s.sent_at
+             FROM {$wpdb->prefix}dd_sent s
+             LEFT JOIN {$wpdb->prefix}dd_packages  p ON p.id = s.package_id
+             LEFT JOIN {$wpdb->prefix}dd_documents d ON d.id = s.document_id
+             WHERE s.user_email = %s
+             ORDER BY s.sent_at DESC",
+            $email
+        ) );
+
+        $summary  = [];
+        $packages = DD_Package::get_all();
+        foreach ( $packages as $pkg ) {
+            $total      = DD_Package::document_count( (int) $pkg->id );
+            $sent_count = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}dd_sent WHERE package_id = %d AND user_email = %s",
+                $pkg->id,
+                $email
+            ) );
+
+            $summary[] = [
+                'package_id'   => $pkg->id,
+                'package_name' => $pkg->name,
+                'active'       => (bool) $pkg->active,
+                'total_docs'   => $total,
+                'sent'         => $sent_count,
+                'remaining'    => max( 0, $total - $sent_count ),
+            ];
+        }
+
+        $categories = [];
+        $terms      = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => false ] );
+        if ( ! is_wp_error( $terms ) ) {
+            $category_rows = $wpdb->get_results(
+                "SELECT DISTINCT object_id FROM {$wpdb->prefix}dd_package_rules WHERE rule_type = 'category' ORDER BY object_id ASC"
+            );
+
+            $term_names = [];
+            foreach ( $terms as $term ) {
+                $term_names[ (int) $term->term_id ] = (string) $term->name;
+            }
+
+            foreach ( $category_rows as $row ) {
+                $category_id = absint( $row->object_id ?? 0 );
+                if ( ! $category_id || empty( $term_names[ $category_id ] ) ) {
+                    continue;
+                }
+
+                $eligible_packages = DD_Package::get_active_by_category( $category_id, true );
+                if ( empty( $eligible_packages ) ) {
+                    continue;
+                }
+
+                $available_count = 0;
+                foreach ( $eligible_packages as $pkg ) {
+                    if ( DD_Package::has_unsent( (int) $pkg->id, $email ) ) {
+                        $available_count++;
+                    }
+                }
+
+                $categories[] = [
+                    'id'              => $category_id,
+                    'name'            => $term_names[ $category_id ],
+                    'eligible_count'  => count( $eligible_packages ),
+                    'available_count' => $available_count,
+                ];
+            }
+        }
+
+        return [
+            'email'      => $email,
+            'history'    => $rows,
+            'summary'    => $summary,
+            'categories' => $categories,
+        ];
     }
 }

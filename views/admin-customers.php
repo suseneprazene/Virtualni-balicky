@@ -42,90 +42,93 @@
             email:  email,
         }, function(res) {
             if (!res.success) { out.html('<div class="notice notice-error"><p>' + escHtml(res.data||'Chyba') + '</p></div>'); return; }
+            renderCustomerResult((res.data && res.data.email) ? res.data.email : email, res.data);
+        });
+    }
 
-            var d = res.data;
-            var html = '<h2>' + escHtml(email) + '</h2>';
+    function renderCustomerResult(email, d) {
+        var out = $('#dd-customer-result');
+        var html = '<h2>' + escHtml(email) + '</h2>';
 
-            // Souhrnná tabulka balíčků
-            html += '<h3>Přehled balíčků</h3>';
-            html += '<table class="widefat striped" style="max-width:700px"><thead><tr>'
-                  + '<th>Balíček</th><th>Stav</th><th>Celkem dok.</th><th>Odesláno</th><th>Zbývá</th>'
+        // Souhrnná tabulka balíčků
+        html += '<h3>Přehled balíčků</h3>';
+        html += '<table class="widefat striped" style="max-width:700px"><thead><tr>'
+              + '<th>Balíček</th><th>Stav</th><th>Celkem dok.</th><th>Odesláno</th><th>Zbývá</th>'
+              + '</tr></thead><tbody>';
+
+        d.summary.forEach(function(s) {
+            var statusLabel = s.active ? '<span style="color:green">Aktivní</span>' : '<span style="color:#aaa">Neaktivní</span>';
+            var remainColor = s.remaining === 0 ? 'color:#c00' : (s.remaining <= 1 ? 'color:#e67e00' : 'color:green');
+            var remainText  = s.remaining === 0
+                ? '✗ vyčerpáno'
+                : s.remaining + ' / ' + s.total_docs;
+            html += '<tr>'
+                  + '<td><strong>' + escHtml(s.package_name) + '</strong></td>'
+                  + '<td>' + statusLabel + '</td>'
+                  + '<td>' + s.total_docs + '</td>'
+                  + '<td>' + s.sent + '</td>'
+                  + '<td style="' + remainColor + ';font-weight:600">' + remainText + '</td>'
+                  + '</tr>';
+        });
+        html += '</tbody></table>';
+
+        // Manuální odeslání náhodného balíčku podle kategorie
+        html += '<h3 style="margin-top:1.5em">Manuální odeslání podle kategorie</h3>';
+        if (!d.categories || !d.categories.length) {
+            html += '<p style="color:#999"><em>Žádné kategorie s balíčky.</em></p>';
+        } else {
+            html += '<table class="widefat striped" style="max-width:900px"><thead><tr>'
+                  + '<th>Kategorie</th><th>Balíčky v kategorii</th><th>K odeslání</th><th>Akce</th>'
                   + '</tr></thead><tbody>';
-
-            d.summary.forEach(function(s) {
-                var statusLabel = s.active ? '<span style="color:green">Aktivní</span>' : '<span style="color:#aaa">Neaktivní</span>';
-                var remainColor = s.remaining === 0 ? 'color:#c00' : (s.remaining <= 1 ? 'color:#e67e00' : 'color:green');
-                var remainText  = s.remaining === 0
-                    ? '✗ vyčerpáno'
-                    : s.remaining + ' / ' + s.total_docs;
+            d.categories.forEach(function(c) {
+                var disabled = c.available_count > 0 ? '' : 'disabled';
                 html += '<tr>'
-                      + '<td><strong>' + escHtml(s.package_name) + '</strong></td>'
-                      + '<td>' + statusLabel + '</td>'
-                      + '<td>' + s.total_docs + '</td>'
-                      + '<td>' + s.sent + '</td>'
-                      + '<td style="' + remainColor + ';font-weight:600">' + remainText + '</td>'
+                      + '<td>' + escHtml(c.name) + '</td>'
+                      + '<td>' + escHtml(String(c.eligible_count)) + '</td>'
+                      + '<td>' + escHtml(String(c.available_count)) + '</td>'
+                      + '<td><button class="button button-secondary dd-send-random-cat" data-category-id="' + escHtml(String(c.id)) + '" ' + disabled + '>Odešli náhodný balíček</button></td>'
                       + '</tr>';
             });
             html += '</tbody></table>';
+        }
 
-            // Manuální odeslání náhodného balíčku podle kategorie
-            html += '<h3 style="margin-top:1.5em">Manuální odeslání podle kategorie</h3>';
-            if (!d.categories || !d.categories.length) {
-                html += '<p style="color:#999"><em>Žádné kategorie s balíčky.</em></p>';
-            } else {
-                html += '<table class="widefat striped" style="max-width:900px"><thead><tr>'
-                      + '<th>Kategorie</th><th>Balíčky v kategorii</th><th>K odeslání</th><th>Akce</th>'
-                      + '</tr></thead><tbody>';
-                d.categories.forEach(function(c) {
-                    var disabled = c.available_count > 0 ? '' : 'disabled';
-                    html += '<tr>'
-                          + '<td>' + escHtml(c.name) + '</td>'
-                          + '<td>' + escHtml(String(c.eligible_count)) + '</td>'
-                          + '<td>' + escHtml(String(c.available_count)) + '</td>'
-                          + '<td><button class="button button-secondary dd-send-random-cat" data-category-id="' + escHtml(String(c.id)) + '" ' + disabled + '>Odešli náhodný balíček</button></td>'
-                          + '</tr>';
-                });
-                html += '</tbody></table>';
-            }
-
-            // Historie odeslaných
-            html += '<h3 style="margin-top:1.5em">Historie odeslaných dárků</h3>';
-            if (!d.history.length) {
-                html += '<p style="color:#999"><em>Žádné odeslané dárky.</em></p>';
-            } else {
-                html += '<table class="widefat striped"><thead><tr>'
-                      + '<th>Balíček</th><th>Dokument</th><th>Objednávka</th><th>Odesláno</th>'
-                      + '</tr></thead><tbody>';
-                d.history.forEach(function(row) {
-                    var icon = mimeIcon(row.file_type);
-                    html += '<tr>'
-                          + '<td>' + escHtml(row.package_name || '—') + '</td>'
-                          + '<td>' + icon + ' ' + escHtml(row.document_name || '—') + '</td>'
-                          + '<td><a href="post.php?post=' + row.order_id + '&action=edit" target="_blank">#' + row.order_id + '</a></td>'
-                          + '<td>' + escHtml(row.sent_at) + '</td>'
-                          + '</tr>';
-                });
-                html += '</tbody></table>';
-            }
-
-            // Sekce pro smazání historie (testování)
-            html += '<div class="dd-clear-history-wrap">';
-            html += '<h3>🧪 Smazat historii (testování)</h3>';
-            html += '<p class="description">Smazáním záznamu se zákazníkovi obnoví nárok na dárek z daného balíčku – včetně <em>první dárek zdarma</em>. Použij jen pro testování.</p>';
-            html += '<div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em">';
-            html += '<select id="dd-clear-package-select" style="min-width:200px"><option value="0">— Všechny balíčky —</option>';
-            d.summary.forEach(function(s) {
-                if (s.sent > 0) {
-                    html += '<option value="' + escHtml(String(s.package_id)) + '">' + escHtml(s.package_name) + ' (' + s.sent + ' odeslání)</option>';
-                }
+        // Historie odeslaných
+        html += '<h3 style="margin-top:1.5em">Historie odeslaných dárků</h3>';
+        if (!d.history.length) {
+            html += '<p style="color:#999"><em>Žádné odeslané dárky.</em></p>';
+        } else {
+            html += '<table class="widefat striped"><thead><tr>'
+                  + '<th>Balíček</th><th>Dokument</th><th>Objednávka</th><th>Odesláno</th>'
+                  + '</tr></thead><tbody>';
+            d.history.forEach(function(row) {
+                var icon = mimeIcon(row.file_type);
+                html += '<tr>'
+                      + '<td>' + escHtml(row.package_name || '—') + '</td>'
+                      + '<td>' + icon + ' ' + escHtml(row.document_name || '—') + '</td>'
+                      + '<td><a href="post.php?post=' + row.order_id + '&action=edit" target="_blank">#' + row.order_id + '</a></td>'
+                      + '<td>' + escHtml(row.sent_at) + '</td>'
+                      + '</tr>';
             });
-            html += '</select>';
-            html += '<button class="button button-link-delete" id="dd-clear-history-btn">🗑 Smazat historii</button>';
-            html += '</div>';
-            html += '</div>';
+            html += '</tbody></table>';
+        }
 
-            out.html(html);
+        // Sekce pro smazání historie (testování)
+        html += '<div class="dd-clear-history-wrap">';
+        html += '<h3>🧪 Smazat historii (testování)</h3>';
+        html += '<p class="description">Smazáním záznamu se zákazníkovi obnoví nárok na dárek z daného balíčku – včetně <em>první dárek zdarma</em>. Použij jen pro testování.</p>';
+        html += '<div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em">';
+        html += '<select id="dd-clear-package-select" style="min-width:200px"><option value="0">— Všechny balíčky —</option>';
+        d.summary.forEach(function(s) {
+            if (s.sent > 0) {
+                html += '<option value="' + escHtml(String(s.package_id)) + '">' + escHtml(s.package_name) + ' (' + s.sent + ' odeslání)</option>';
+            }
         });
+        html += '</select>';
+        html += '<button class="button button-link-delete" id="dd-clear-history-btn">🗑 Smazat historii</button>';
+        html += '</div>';
+        html += '</div>';
+
+        out.html(html);
     }
 
     function mimeIcon(mime) {
@@ -191,9 +194,13 @@
                 return;
             }
             var msg = (res.data && res.data.message) ? res.data.message : 'Balíček byl odeslán.';
-            var notice = $('<div class="notice notice-success is-dismissible"><p>✅ ' + escHtml(msg) + '</p></div>');
-            $('#dd-customer-result').prepend(notice);
-            search(email);
+            if (res.data && res.data.customer_data) {
+                renderCustomerResult((res.data.customer_data.email || email), res.data.customer_data);
+                var notice = $('<div class="notice notice-success is-dismissible"><p>✅ ' + escHtml(msg) + '</p></div>');
+                $('#dd-customer-result').prepend(notice);
+            } else {
+                search(email);
+            }
         }).fail(function() {
             alert('Chyba při komunikaci se serverem.');
             btn.prop('disabled', false).text('Odešli náhodný balíček');

@@ -18,21 +18,33 @@ class DD_Package {
         return $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}dd_packages WHERE active = 1 ORDER BY id DESC" ) ?: [];
     }
 
-    public static function get_active_by_category( int $category_id ): array {
+    public static function get_active_by_category( int $category_id, bool $include_children = true ): array {
         $category_id = absint( $category_id );
         if ( ! $category_id ) {
             return [];
         }
 
+        $category_ids = [ $category_id ];
+        if ( $include_children ) {
+            $children = get_term_children( $category_id, 'product_cat' );
+            if ( ! is_wp_error( $children ) && ! empty( $children ) ) {
+                $category_ids = array_values( array_unique( array_map( 'absint', array_merge( $category_ids, $children ) ) ) );
+            }
+        }
+
+        $placeholders = implode( ',', array_fill( 0, count( $category_ids ), '%d' ) );
+
         global $wpdb;
-        return $wpdb->get_results( $wpdb->prepare(
+        $sql = $wpdb->prepare(
             "SELECT DISTINCT p.*
              FROM {$wpdb->prefix}dd_packages p
              INNER JOIN {$wpdb->prefix}dd_package_rules r ON r.package_id = p.id
-             WHERE p.active = 1 AND r.rule_type = 'category' AND r.object_id = %d
+             WHERE p.active = 1 AND r.rule_type = 'category' AND r.object_id IN ($placeholders)
              ORDER BY p.id DESC",
-            $category_id
-        ) ) ?: [];
+            $category_ids
+        );
+
+        return $wpdb->get_results( $sql ) ?: [];
     }
 
     // ── Pravidla přiřazení ────────────────────────────────────────────────────
