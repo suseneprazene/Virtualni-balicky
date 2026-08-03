@@ -98,7 +98,7 @@
             html += '<p style="color:#999"><em>Žádné odeslané dárky.</em></p>';
         } else {
             html += '<table class="widefat striped"><thead><tr>'
-                  + '<th>Balíček</th><th>Dokument</th><th>Objednávka</th><th>Odesláno</th>'
+                  + '<th>Balíček</th><th>Dokument</th><th>Objednávka</th><th>Odesláno</th><th>Akce</th>'
                   + '</tr></thead><tbody>';
             d.history.forEach(function(row) {
                 var icon = mimeIcon(row.file_type);
@@ -107,15 +107,16 @@
                       + '<td>' + icon + ' ' + escHtml(row.document_name || '—') + '</td>'
                       + '<td><a href="post.php?post=' + row.order_id + '&action=edit" target="_blank">#' + row.order_id + '</a></td>'
                       + '<td>' + escHtml(row.sent_at) + '</td>'
+                      + '<td><button class="button button-link-delete dd-delete-sent-record" data-sent-id="' + escHtml(String(row.id)) + '" style="padding:2px 8px">🗑</button></td>'
                       + '</tr>';
             });
             html += '</tbody></table>';
         }
 
-        // Sekce pro smazání historie (testování)
+        // Sekce pro smazání historie
         html += '<div class="dd-clear-history-wrap">';
-        html += '<h3>🧪 Smazat historii (testování)</h3>';
-        html += '<p class="description">Smazáním záznamu se zákazníkovi obnoví nárok na dárek z daného balíčku – včetně <em>první dárek zdarma</em>. Použij jen pro testování.</p>';
+        html += '<h3>🗑 Smazat historii celé kategorie</h3>';
+        html += '<p class="description">Smazáním záznamu se zákazníkovi obnoví nárok na dárek z daného balíčku – včetně <em>první dárek zdarma</em>.</p>';
         html += '<div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin-top:.5em">';
         html += '<select id="dd-clear-package-select" style="min-width:200px"><option value="0">— Všechny balíčky —</option>';
         d.summary.forEach(function(s) {
@@ -169,6 +170,26 @@
             var notice = $('<div class="notice notice-success is-dismissible"><p>✅ Smazáno ' + deleted + ' záznamů. Historie zákazníka byla vymazána.</p></div>');
             $('#dd-customer-result').prepend(notice);
             // Znovu načti přehled
+            search(email);
+        });
+    });
+
+    // Smazání jednotlivého záznamu z historie
+    $(document).on('click', '.dd-delete-sent-record', function() {
+        var email  = $('#dd-customer-email').val().trim();
+        var sentId = $(this).data('sent-id');
+        if (!confirm('Opravdu smazat tento záznam z historie zákazníka ' + email + '?')) return;
+
+        $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
+            action:   'dd_delete_sent_record',
+            nonce:    nonce,
+            email:    email,
+            sent_id:  sentId,
+        }, function(res) {
+            if (!res.success) {
+                alert('Chyba: ' + (res.data || 'neznámá'));
+                return;
+            }
             search(email);
         });
     });

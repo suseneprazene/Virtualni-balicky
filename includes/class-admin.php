@@ -19,6 +19,7 @@ class DD_Admin {
         add_action( 'wp_ajax_dd_customer_history',  [ __CLASS__, 'ajax_customer_history' ] );
         add_action( 'wp_ajax_dd_download_document', [ __CLASS__, 'ajax_download_document' ] );
         add_action( 'wp_ajax_dd_clear_customer',    [ __CLASS__, 'ajax_clear_customer' ] );
+        add_action( 'wp_ajax_dd_delete_sent_record', [ __CLASS__, 'ajax_delete_sent_record' ] );
         add_action( 'wp_ajax_dd_send_random_by_category', [ __CLASS__, 'ajax_send_random_by_category' ] );
     }
 
@@ -473,7 +474,7 @@ class DD_Admin {
         wp_send_json_success( self::build_customer_history_payload( $email ) );
     }
 
-    // ── AJAX: smazání historie zákazníka (pro testování) ──────────────────────
+    // ── AJAX: smazání historie zákazníka ─────────────────────────────────────
 
     public static function ajax_clear_customer(): void {
         check_ajax_referer( 'dd_admin_nonce', 'nonce' );
@@ -500,6 +501,32 @@ class DD_Admin {
         }
 
         wp_send_json_success( [ 'deleted' => (int) $deleted ] );
+    }
+
+    // ── AJAX: smazání jednotlivého záznamu z historie ─────────────────────────
+
+    public static function ajax_delete_sent_record(): void {
+        check_ajax_referer( 'dd_admin_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_woocommerce' ) ) wp_send_json_error( 'Nedostatečná oprávnění.' );
+
+        $email   = sanitize_email( $_POST['email'] ?? '' );
+        $sent_id = absint( $_POST['sent_id'] ?? 0 );
+
+        if ( ! $email ) wp_send_json_error( 'Chybí e-mail.' );
+        if ( ! $sent_id ) wp_send_json_error( 'Chybí ID záznamu.' );
+
+        global $wpdb;
+        $deleted = $wpdb->delete(
+            $wpdb->prefix . 'dd_sent',
+            [ 'id' => $sent_id, 'user_email' => $email ],
+            [ '%d', '%s' ]
+        );
+
+        if ( ! $deleted ) {
+            wp_send_json_error( 'Záznam nenalezen nebo nebyl smazán.' );
+        }
+
+        wp_send_json_success( [ 'deleted' => 1 ] );
     }
 
     public static function ajax_send_random_by_category(): void {
