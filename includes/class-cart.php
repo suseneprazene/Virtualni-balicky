@@ -34,12 +34,6 @@ class DD_Cart {
         add_filter( 'woocommerce_cart_item_class',            [ __CLASS__, 'cart_item_class' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_product',          [ __CLASS__, 'cart_item_product' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_thumbnail',        [ __CLASS__, 'cart_item_thumbnail' ], 10, 3 );
-        // Ensure Store API / Blocks mini-cart (which bypasses woocommerce_cart_item_thumbnail)
-        // always uses the placeholder product's current thumbnail.
-        add_filter( 'woocommerce_product_get_image',          [ __CLASS__, 'virtual_product_get_image' ], 10, 2 );
-        // Include the placeholder thumbnail ID in the cart hash so that WooCommerce
-        // invalidates the classic mini-cart localStorage fragment when the image changes.
-        add_filter( 'woocommerce_cart_hash',                  [ __CLASS__, 'include_thumbnail_in_cart_hash' ] );
         add_filter( 'woocommerce_cart_item_price',            [ __CLASS__, 'cart_item_price' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_quantity',         [ __CLASS__, 'cart_item_quantity' ], 10, 3 );
         add_filter( 'woocommerce_cart_item_subtotal',         [ __CLASS__, 'cart_item_subtotal' ], 10, 3 );
@@ -52,6 +46,9 @@ class DD_Cart {
 
         // Blokový košík – jednorázový inject přes footer
         add_action( 'wp_footer', [ __CLASS__, 'inject_block_cart_init' ] );
+
+        // Skryj obrázek placeholder produktu v potvrzovacím e-mailu WooCommerce
+        add_filter( 'woocommerce_order_item_thumbnail', [ __CLASS__, 'hide_email_thumbnail' ], 10, 2 );
     }
 
     // ── Skripty ───────────────────────────────────────────────────────────────
@@ -164,38 +161,6 @@ class DD_Cart {
             $pid = DD_Installer::get_or_create_placeholder_product();
         }
         return (int) $pid;
-    }
-
-    /**
-     * Returns the featured image attachment ID of the placeholder product.
-     */
-    private static function get_placeholder_thumbnail_id(): int {
-        $placeholder_id = self::get_placeholder_product_id();
-        if ( $placeholder_id <= 0 ) {
-            return 0;
-        }
-
-        return (int) get_post_thumbnail_id( $placeholder_id );
-    }
-
-    /**
-     * Returns placeholder product thumbnail HTML, optionally falling back to the
-     * standard WooCommerce placeholder output when no product image is set.
-     */
-    private static function get_placeholder_thumbnail_html( string $size, array $attr = [], bool $fallback_to_placeholder = false ): string {
-        $image_id = self::get_placeholder_thumbnail_id();
-        if ( $image_id > 0 ) {
-            $image_html = (string) wp_get_attachment_image( $image_id, $size, false, $attr );
-            if ( $image_html !== '' ) {
-                return $image_html;
-            }
-        }
-
-        if ( $fallback_to_placeholder ) {
-            return (string) wc_placeholder_img( $size, $attr );
-        }
-
-        return '';
     }
 
     /**
@@ -429,24 +394,35 @@ class DD_Cart {
         }
     }
 
-    public static function cart_item_name( string $name, array $cart_item, string $cart_item_key ): string {
-        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
-        $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
-        if ( ! $pkg ) return $name;
-        $label_text     = self::virtual_item_label( $pkg );
-        $thumbnail_html = self::get_placeholder_thumbnail_html(
-            'woocommerce_gallery_thumbnail',
-            [
-                'class'    => 'dd-cart-item-icon attachment-woocommerce_gallery_thumbnail size-woocommerce_gallery_thumbnail',
-                'alt'      => $label_text,
+public static function cart_item_name( string $name, array $cart_item, string $cart_item_key ): string {
+    if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) return $name;
+    $pkg = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
+    if ( ! $pkg ) return $name;
+
+    $label_text = self::virtual_item_label( $pkg );
+
+    // Zobraz obrázek jen pokud má placeholder produkt nastavenou featured image
+    $icon_html = '';
+    $placeholder_id = self::get_placeholder_product_id();
+    if ( $placeholder_id > 0 ) {
+        $image_id = (int) get_post_thumbnail_id( $placeholder_id );
+        if ( $image_id > 0 ) {
+            $icon_html = wp_get_attachment_image( $image_id, 'woocommerce_gallery_thumbnail', false, [
+                'class'    => 'dd-cart-item-icon',
+                'alt'      => '',
                 'loading'  => 'lazy',
                 'decoding' => 'async',
-            ]
-        );
-        return wp_kses_post(
-            '<span class="dd-cart-item-label" data-dd-gift-item="1">' . $thumbnail_html . '<span class="dd-cart-item-text">' . esc_html( $label_text ) . '</span></span>'
-        );
+            ] );
+        }
     }
+
+    return wp_kses_post(
+        '<span class="dd-cart-item-label" data-dd-gift-item="1">'
+        . $icon_html
+        . '<span class="dd-cart-item-text">' . esc_html( $label_text ) . '</span>'
+        . '</span>'
+    );
+}
 
     public static function cart_item_class( string $class, array $cart_item, string $cart_item_key ): string {
         if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
@@ -481,64 +457,42 @@ class DD_Cart {
         return self::make_virtual_product( $pkg );
     }
 
-    public static function cart_item_thumbnail( string $thumbnail, array $cart_item, string $cart_item_key ): string {
-        if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
-            return $thumbnail;
+public static function cart_item_thumbnail( string $thumbnail, array $cart_item, string $cart_item_key ): string {
+    if ( ! isset( $cart_item[ self::CART_ITEM_KEY ] ) ) {
+        return $thumbnail;
+    }
+    $placeholder_id = self::get_placeholder_product_id();
+    if ( $placeholder_id > 0 ) {
+        $image_id = get_post_thumbnail_id( $placeholder_id );
+        if ( $image_id > 0 ) {
+            return wp_get_attachment_image( $image_id, 'woocommerce_thumbnail', false, [
+                'class' => 'attachment-woocommerce_thumbnail size-woocommerce_thumbnail',
+            ] );
         }
-        $pkg           = DD_Package::get( (int) $cart_item[ self::CART_ITEM_KEY ] );
-        $thumbnail_alt = $pkg ? self::virtual_item_label( $pkg ) : __( 'Virtuální balíček', 'virtualni-balicek' );
-        return self::get_placeholder_thumbnail_html(
-            'woocommerce_thumbnail',
-            [
-                'class'    => 'attachment-woocommerce_thumbnail size-woocommerce_thumbnail',
-                'alt'      => $thumbnail_alt,
-                'loading'  => 'lazy',
-                'decoding' => 'async',
-            ],
-            true
-        );
     }
 
+}
     /**
-     * Overrides the product image HTML for DD_Virtual_Product instances so that
-     * the WooCommerce Store API / Blocks mini-cart (which calls $product->get_image()
-     * directly, bypassing the woocommerce_cart_item_thumbnail filter) always shows
-     * the placeholder product's current featured image.
+     * Skryje obrázek DD placeholder produktu v potvrzovacím e-mailu WooCommerce.
+     * Hook: woocommerce_order_item_thumbnail
      *
-     * @param string     $html    Image HTML generated by WooCommerce.
-     * @param WC_Product $product Product object.
-     * @return string
+     * @param string        $image     HTML obrázku generované WooCommerce.
+     * @param WC_Order_Item $item      Položka objednávky.
+     * @return string  Prázdný řetězec pokud jde o DD položku, jinak původní HTML.
      */
-    public static function virtual_product_get_image( string $html, $product ): string {
-        if ( ! $product instanceof DD_Virtual_Product ) {
-            return $html;
+    public static function hide_email_thumbnail( string $image, $item ): string {
+        if ( ! $item instanceof WC_Order_Item_Product ) {
+            return $image;
         }
-        $override = self::get_placeholder_thumbnail_html(
-            'woocommerce_thumbnail',
-            [
-                'class'    => 'attachment-woocommerce_thumbnail size-woocommerce_thumbnail',
-                'loading'  => 'lazy',
-                'decoding' => 'async',
-            ],
-            true
-        );
-        return $override !== '' ? $override : $html;
-    }
-
-    /**
-     * Appends the placeholder product's current thumbnail ID to the WooCommerce
-     * cart hash so that the classic mini-cart localStorage fragment is automatically
-     * invalidated whenever the product image changes (even without a cart modification).
-     *
-     * @param string $hash Existing cart hash.
-     * @return string
-     */
-    public static function include_thumbnail_in_cart_hash( string $hash ): string {
-        $thumbnail_id = self::get_placeholder_thumbnail_id();
-        if ( $thumbnail_id > 0 ) {
-            $hash .= '_dd_thumb_' . $thumbnail_id;
+        $placeholder_id = (int) get_option( 'dd_placeholder_product_id', 0 );
+        if ( $placeholder_id <= 0 ) {
+            return $image;
         }
-        return $hash;
+        if ( (int) $item->get_product_id() === $placeholder_id
+            || (int) $item->get_variation_id() === $placeholder_id ) {
+            return '';
+        }
+        return $image;
     }
 
     public static function cart_item_price( string $price_html, array $cart_item, string $cart_item_key ): string {
@@ -1138,7 +1092,7 @@ class DD_Cart {
             display:none !important;
         }
         .dd-cart-item-label{display:inline-flex;align-items:center;gap:.35em;}
-        .dd-cart-item-icon{width:1.5em;height:1.5em;flex:0 0 1.5em;object-fit:cover;border-radius:2px;}
+        .dd-cart-item-icon{width:1em;height:1em;display:inline-block;flex:0 0 1em;vertical-align:middle;}
         ';
     }
 }

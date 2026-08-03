@@ -4,6 +4,7 @@
 
     var selectionInProgress = false;
     var selectionTimeoutMs = 12000;
+    var packageIconFilename = 'package-icon.svg';
     var packageLabelNeedle = ((DD_Cart && DD_Cart.package_label_needle) || '').toLowerCase();
     var cartRowSelectors = 'tr.cart_item, li.wc-block-cart-items__row, .wc-block-cart-items__row, .wc-block-components-order-summary-item';
     var cartRootSelectors = ['form.woocommerce-cart-form', '.wc-block-cart-items', '.wc-block-cart'];
@@ -132,6 +133,21 @@
 
         cartRows.forEach(function (row) {
             if (row.querySelector('[data-dd-gift-item="1"]')) {
+                row.classList.add('dd-cart-item');
+                return;
+            }
+
+            var image = row.querySelector('img');
+            var src = image ? (image.getAttribute('src') || '') : '';
+            var path = '';
+            if (src) {
+                try {
+                    path = new URL(src, window.location.origin).pathname || '';
+                } catch (e) {
+                    path = src;
+                }
+            }
+            if (path.endsWith('/' + packageIconFilename) || path === packageIconFilename) {
                 row.classList.add('dd-cart-item');
                 return;
             }

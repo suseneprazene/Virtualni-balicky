@@ -52,42 +52,50 @@ class DD_Email {
 
         $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
 
-        // Příloha
-        $attachments = [];
-        $nameMap     = [];
+        // Příloha – sestavíme seznam {cesta, zobrazovaný název} pro každý dárek.
+        // Přílohy přidáváme přímo přes $phpmailer->addAttachment() v hooku
+        // phpmailer_init, protože předáváním cest přes wp_mail() PHPMailer jako
+        // display name vždy použije basename (= náhodný interní název souboru).
+        $attachmentDefs = [];
         foreach ( $gifts as $gift ) {
             $gift_document = $gift['document'] ?? null;
             if ( ! $gift_document || empty( $gift_document->file_path ) || ! file_exists( $gift_document->file_path ) ) {
                 continue;
             }
 
-$attachments[] = $gift_document->file_path;
-$ext           = strtolower( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_EXTENSION ) );
-$baseFilename  = sanitize_file_name( (string) pathinfo( (string) $gift_document->name, PATHINFO_FILENAME ) );
-$filename      = $baseFilename !== '' ? $baseFilename : sanitize_file_name( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_FILENAME ) );
-if ( $ext !== '' ) {
-    $filename .= '.' . $ext;
-}
-$nameMap[ $gift_document->file_path ] = $filename;
-        }
-
-        $renameCallback = static function ( $phpmailer ) use ( $nameMap ): void {
-            if ( empty( $nameMap ) || ! is_array( $phpmailer->attachment ?? null ) || $phpmailer->attachment === [] ) {
-                return;
+            $ext      = strtolower( (string) pathinfo( (string) $gift_document->file_path, PATHINFO_EXTENSION ) );
+            $mime     = ! empty( $gift_document->file_type ) ? $gift_document->file_type : 'application/octet-stream';
+            // Název souboru: primárně admin název dokumentu, zachováváme diakritiku
+            // (není třeba sanitize_file_name – PHPMailer název jen zakóduje do hlavičky).
+            $basename = trim( (string) $gift_document->name );
+            if ( $basename === '' ) {
+                $basename = pathinfo( (string) $gift_document->file_path, PATHINFO_FILENAME );
+            }
+            if ( $ext !== '' ) {
+                $basename .= '.' . $ext;
             }
 
-            foreach ( $phpmailer->attachment as $i => $att ) {
-                $path = $att[0] ?? '';
-                if ( $path !== '' && isset( $nameMap[ $path ] ) ) {
-                    if ( ( $att[2] ?? '' ) !== $nameMap[ $path ] ) {
-                        $phpmailer->attachment[ $i ][2] = $nameMap[ $path ];
-                    }
+            $attachmentDefs[] = [
+                'path'     => (string) $gift_document->file_path,
+                'filename' => $basename,
+                'mime'     => $mime,
+            ];
+        }
+
+        $attachCallback = static function ( $phpmailer ) use ( $attachmentDefs ): void {
+            foreach ( $attachmentDefs as $def ) {
+                try {
+                    $phpmailer->addAttachment( $def['path'], $def['filename'], 'base64', $def['mime'] );
+                } catch ( \Exception $e ) {
+                    // Soubor nelze přiložit – zaloguj a pokračuj.
+                    error_log( '[DD_Email] addAttachment failed for ' . $def['path'] . ': ' . $e->getMessage() );
                 }
             }
         };
-        add_action( 'phpmailer_init', $renameCallback );
-        $result = wp_mail( $to, $subject, $message, $headers, $attachments );
-        remove_action( 'phpmailer_init', $renameCallback );
+        add_action( 'phpmailer_init', $attachCallback );
+        // Žádné přílohy nepředáváme přes wp_mail – přidá je attachCallback výše.
+        $result = wp_mail( $to, $subject, $message, $headers, [] );
+        remove_action( 'phpmailer_init', $attachCallback );
 
         return (bool) $result;
     }
