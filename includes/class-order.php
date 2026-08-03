@@ -190,6 +190,68 @@ class DD_Order {
         }
     }
 
+    /**
+     * Ruční odeslání náhodného dárku z konkrétního balíčku zákazníkovi podle e-mailu.
+     *
+     * @return array{success:bool,message:string}
+     */
+    public static function send_manual_random_package_for_customer( string $email, int $package_id ): array {
+        $email      = sanitize_email( $email );
+        $package_id = absint( $package_id );
+
+        if ( ! $email ) {
+            return [ 'success' => false, 'message' => __( 'Neplatný zákaznický e-mail.', 'virtualni-balicek' ) ];
+        }
+        if ( ! $package_id ) {
+            return [ 'success' => false, 'message' => __( 'Neplatný balíček.', 'virtualni-balicek' ) ];
+        }
+
+        $package = DD_Package::get( $package_id );
+        if ( ! $package || ! (int) $package->active ) {
+            return [ 'success' => false, 'message' => __( 'Balíček není dostupný.', 'virtualni-balicek' ) ];
+        }
+
+        $orders = wc_get_orders( [
+            'billing_email' => $email,
+            'limit'         => 1,
+            'orderby'       => 'date',
+            'order'         => 'DESC',
+            'return'        => 'objects',
+        ] );
+        $order = ! empty( $orders ) ? $orders[0] : null;
+        if ( ! $order instanceof WC_Order ) {
+            return [ 'success' => false, 'message' => __( 'Pro zákazníka nebyla nalezena žádná objednávka.', 'virtualni-balicek' ) ];
+        }
+
+        $document = DD_Package::pick_random_unsent( $package_id, $email );
+        if ( ! $document ) {
+            return [ 'success' => false, 'message' => __( 'Zákazník už obdržel všechny dokumenty z dostupných balíčků v této kategorii.', 'virtualni-balicek' ) ];
+        }
+
+        $sent = DD_Email::send_gift( $order, $package, $document );
+        if ( ! $sent ) {
+            return [ 'success' => false, 'message' => __( 'Nepodařilo se odeslat e-mail s dárkem.', 'virtualni-balicek' ) ];
+        }
+
+        $user_id = $order->get_user_id() ?: null;
+        DD_Package::record_sent( $package_id, (int) $document->id, $email, $order->get_id(), $user_id );
+        $order->add_order_note( sprintf(
+            __( 'Ruční odeslání dárku [%s]: "%s" → %s', 'virtualni-balicek' ),
+            $package->name,
+            $document->name,
+            $email
+        ) );
+
+        return [
+            'success' => true,
+            'message' => sprintf(
+                __( 'Odesláno: balíček "%1$s", dokument "%2$s".', 'virtualni-balicek' ),
+                $package->name,
+                $document->name
+            ),
+        ];
+    }
+
     private static function dispatch_gift(
         WC_Order $order,
         int $package_id,
